@@ -364,7 +364,7 @@ const db  = getFirestore(app);
 
 // ── State ─────────────────────────────────────────────────
 const ME = localStorage.getItem('active_session');
-if (!ME) { window.location.href = 'auth.html'; throw new Error('No session'); }
+if (!ME) { window.location.href = 'auth.html'; throw new Error('stop'); }
 
 let balance      = 0;
 let allTables    = [];
@@ -619,7 +619,6 @@ window.setVis = function(v) {
 };
 
 window.createTable = async function() {
-    if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     const name  = document.getElementById('c-name').value.trim() || `Table de ${ME}`;
     const sb    = parseInt(document.getElementById('c-sb').value)    || 5;
     const bb    = parseInt(document.getElementById('c-bb').value)    || 10;
@@ -707,7 +706,6 @@ window.closeJoin = function() {
 };
 
 window.confirmJoin = async function() {
-    if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     if (!selTableId||!selTable) return;
     const amount = parseInt(document.getElementById('j-amount').value);
     const pw     = document.getElementById('j-pw').value.trim();

@@ -363,7 +363,7 @@ const db  = getFirestore(app);
 // ── State ─────────────────────────────────────────────────
 const ME       = localStorage.getItem('active_session');
 const tableId  = new URLSearchParams(location.search).get('table');
-if (!ME || !tableId) { location.href = 'poker-lobby.html'; throw new Error('No session'); }
+if (!ME || !tableId) { location.href = 'poker-lobby.html'; throw new Error('stop'); }
 
 let tableData  = null;
 let timerInt   = null;
@@ -768,11 +768,11 @@ window.playerAction = async function(type) {
     // Advance turn
     const activePlayers = Object.keys(newPlayers).filter(n => newPlayers[n].status !== 'folded' && newPlayers[n].chips > 0);
     const allKeys       = Object.keys(newPlayers);
-    const _rawIdx       = (ME && allKeys.indexOf(ME) !== -1) ? allKeys.indexOf(ME) : 0;
+    const _ci = (ME && allKeys.includes(ME)) ? allKeys.indexOf(ME) : 0;
     let   nextTurn      = null;
 
     for (let i=1; i<=allKeys.length; i++) {
-        const candidate = allKeys[(_rawIdx+i)%allKeys.length];
+        const candidate = allKeys[(_ci+i)%allKeys.length];
         if (candidate && newPlayers[candidate] && newPlayers[candidate].status !== 'folded') { nextTurn = candidate; break; }
     }
 
@@ -801,8 +801,8 @@ async function advancePhase(gs, players) {
     }
 
     const phases = ['preflop','flop','turn','river','showdown'];
-    const _phIdx = gs.phase ? phases.indexOf(gs.phase) : -1;
-    const nextPh = (_phIdx !== -1 && phases[_phIdx+1]) ? phases[_phIdx+1] : 'showdown';
+    const _pi = gs.phase ? phases.indexOf(gs.phase) : -1;
+    const nextPh = (_pi >= 0 && phases[_pi+1]) ? phases[_pi+1] : 'showdown';
 
     gs.lastActions  = {};
     gs.bets         = {};
@@ -827,11 +827,11 @@ async function advancePhase(gs, players) {
 
     // Set first active player after dealer as next turn
     const allKeys   = Object.keys(players);
-    const _dIdx     = (gs.dealer && allKeys.indexOf(gs.dealer) !== -1) ? allKeys.indexOf(gs.dealer) : 0;
-    let nextTurn    = allKeys[(_dIdx+1)%allKeys.length];
+    const _di = (gs.dealer && allKeys.includes(gs.dealer)) ? allKeys.indexOf(gs.dealer) : 0;
+    let nextTurn    = allKeys[(_di+1)%allKeys.length];
     for (let i=0; i<allKeys.length; i++) {
-        const _c = allKeys[(_dIdx+1+i)%allKeys.length];
-        if (_c && players[_c] && players[_c].status !== 'folded') { nextTurn = _c; break; }
+        const _ck = allKeys[(_di+1+i)%allKeys.length];
+        if (_ck && players[_ck] && players[_ck].status !== 'folded') { nextTurn = _ck; break; }
     }
     gs.currentTurn = nextTurn;
 
