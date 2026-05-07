@@ -18,8 +18,27 @@
   onAuthStateChanged(window.auth,u=>{if(u&&typeof refreshUserData==="function")refreshUserData();});
 </script>
 <style>
-canvas#plinko{display:block;border-radius:16px;background:#0a0a0f;}
-@keyframes ballDrop{0%{transform:translateY(-10px);opacity:0;}100%{transform:none;opacity:1;}}
+canvas#plinko { display:block; border-radius:20px; }
+
+/* Bucket flash animation */
+@keyframes bucketFlash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Sidebar result history */
+.hist-chip {
+  width: 20px; height: 20px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 7px; font-weight: 900; flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+/* Risk button selected state */
+.risk-btn.active-risk {
+  filter: brightness(1.3);
+  box-shadow: 0 0 10px currentColor;
+}
 </style>
 </head>
 <body class="h-screen bg-[#0F0F12] text-white overflow-hidden font-sans flex flex-col p-4 gap-4">
@@ -103,10 +122,21 @@ canvas#plinko{display:block;border-radius:16px;background:#0a0a0f;}
       </div>
     </div>
 
-    <!-- Bouton -->
-    <button id="drop-btn" onclick="dropBall()" class="w-full bg-[#8b5cf6] hover:brightness-110 active:scale-95 text-black font-black py-5 rounded-2xl uppercase italic tracking-tighter transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)]">
-      Lancer la balle
-    </button>
+    <!-- Bouton + Auto -->
+    <div class="flex gap-2">
+      <button id="drop-btn" onclick="dropBall()" class="flex-1 bg-[#8b5cf6] hover:brightness-110 active:scale-95 text-black font-black py-4 rounded-2xl uppercase italic tracking-tighter transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+        Lancer
+      </button>
+      <button id="auto-btn" onclick="toggleAutoBet()" class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[10px] px-4 py-4 rounded-2xl hover:border-[#8b5cf6]/50 hover:text-white transition-all uppercase">
+        Auto
+      </button>
+    </div>
+
+    <!-- Historique des 10 derniers résultats -->
+    <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-3">
+      <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2">Derniers résultats</p>
+      <div id="hist-row" class="flex gap-1.5 flex-wrap min-h-[24px]"></div>
+    </div>
 
     <!-- Logs -->
     <div class="flex-1 flex flex-col min-h-0 border-t border-zinc-800 pt-4">
@@ -117,7 +147,7 @@ canvas#plinko{display:block;border-radius:16px;background:#0a0a0f;}
 
   <!-- GAME CANVAS -->
   <section class="flex-1 bg-[#141417] border border-[#1f1f21] rounded-3xl flex items-center justify-center relative overflow-hidden shadow-2xl">
-    <canvas id="plinko" width="520" height="560"></canvas>
+    <canvas id="plinko" style="max-height:100%;max-width:100%;object-fit:contain;"></canvas>
     <!-- Result flash -->
     <div id="plinko-result" class="absolute bottom-8 left-1/2 -translate-x-1/2 text-2xl font-black italic uppercase tracking-tighter pointer-events-none opacity-0 transition-all duration-300"></div>
   </section>
@@ -131,237 +161,421 @@ canvas#plinko{display:block;border-radius:16px;background:#0a0a0f;}
 <div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
 <script src="script.js"></script>
 <script>
-// ===== PLINKO ENGINE =====
+// ===== PLINKO ENGINE — v2.0 =====
+// 16 rangées, 17 buckets, distribution binomiale correcte
+// House edge: Low 3.5%, Mid 1%, High 3%
+
 const canvas = document.getElementById('plinko');
 const ctx    = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
 
-// Multipliers per risk level
+// Dimensions calibrées
+const W = 580, H = 660;
+canvas.width  = W;
+canvas.height = H;
+
+const ROWS     = 16;
+const SLOTS    = ROWS + 1;   // 17 buckets
+const PAD_X    = 18;         // left/right padding
+const PAD_Y    = 38;         // top padding
+const STEP_X   = 32;         // bucket width (16 * 32 = 512, + 2*18 = 548 ≤ 580)
+const STEP_Y   = 35;         // row spacing
+const BUCKET_H = 54;         // bucket zone height
+const PEG_R    = 4.5;        // peg radius
+const BALL_R   = 7;          // ball radius
+const CENTER_X = PAD_X + 8 * STEP_X + STEP_X / 2; // = 290
+
+// ── MULTIPLIERS (EV calibré) ──────────────────────────────────────────
 const MULTS = {
-  low:  [5.6, 2.1, 1.1, 1.0, 0.5, 1.0, 1.1, 2.1, 5.6],
-  mid:  [13,  3,   1.3, 0.7, 0.4, 0.7, 1.3, 3,   13],
-  high: [29,  4,   1.5, 0.3, 0.2, 0.3, 1.5, 4,   29],
-};
-const MULT_COLORS = {
-  low:  ['#fbbf24','#a78bfa','#22c55e','#60a5fa','#6b7280','#60a5fa','#22c55e','#a78bfa','#fbbf24'],
-  mid:  ['#fbbf24','#f97316','#22c55e','#60a5fa','#6b7280','#60a5fa','#22c55e','#f97316','#fbbf24'],
-  high: ['#ef4444','#f97316','#22c55e','#6b7280','#374151','#6b7280','#22c55e','#f97316','#ef4444'],
+  low:  [16,   9,    2,   1.4,  1.2,  1.1,  1.0,  0.9,  0.8,  0.9,  1.0,  1.1,  1.2,  1.4,   2,   9,  16],
+  mid:  [110,  41,  10,   5,    3,    1.5,  1.0,  0.5,  0.3,  0.5,  1.0,  1.5,   3,   5,   10,  41, 110],
+  high: [1000, 130,  26,   9,    4,    2,    0.2,  0.2,  0.1,  0.2,  0.2,   2,    4,   9,   26, 130,1000],
 };
 
-const ROWS = 12;
-const COLS = ROWS + 1; // 13 pegs per bottom row
-const PAD_X = 60, PAD_Y = 48;
-const STEP_X = (W - PAD_X*2) / (COLS - 1);
-const STEP_Y = (H - PAD_Y*2 - 80) / (ROWS);
+const BUCKET_COLORS = {
+  low:  ['#ef4444','#f97316','#fbbf24','#22c55e','#60a5fa','#6b7280','#4b5563','#374151','#374151','#374151','#4b5563','#6b7280','#60a5fa','#22c55e','#fbbf24','#f97316','#ef4444'],
+  mid:  ['#ef4444','#ef4444','#f97316','#fbbf24','#fbbf24','#22c55e','#4b5563','#374151','#1f2937','#374151','#4b5563','#22c55e','#fbbf24','#fbbf24','#f97316','#ef4444','#ef4444'],
+  high: ['#ef4444','#ef4444','#ef4444','#f97316','#fbbf24','#22c55e','#374151','#1f2937','#111827','#1f2937','#374151','#22c55e','#fbbf24','#f97316','#ef4444','#ef4444','#ef4444'],
+};
 
 let currentRisk = 'mid';
-let balls = [];
-let pkBalls=0, pkWins=0, pkBest=0;
+let balls        = [];
+let flashBuckets = {};  // {slotIdx: alpha}
+let pkBalls = 0, pkWins = 0, pkBest = 0;
+let historyResults = []; // [{mult, profit}]
 
+// ── RISK SELECTOR ────────────────────────────────────────────────────
 function setRisk(r) {
   currentRisk = r;
-  document.querySelectorAll('.risk-btn').forEach(b => b.style.opacity='0.5');
-  document.getElementById('risk-'+r).style.opacity='1';
+  document.querySelectorAll('.risk-btn').forEach(b => {
+    b.classList.remove('active-risk');
+    b.style.opacity = '0.55';
+  });
+  const btn = document.getElementById('risk-' + r);
+  btn.style.opacity = '1';
+  btn.classList.add('active-risk');
   renderMultDisplay();
 }
 
 function renderMultDisplay() {
   const el = document.getElementById('mult-display');
-  const mults = MULTS[currentRisk];
-  const colors = MULT_COLORS[currentRisk];
-  el.innerHTML = mults.map((m,i) => 
-    `<span style="background:${colors[i]}22;color:${colors[i]};border:1px solid ${colors[i]}44;padding:2px 7px;border-radius:6px;">x${m}</span>`
+  const mults  = MULTS[currentRisk];
+  const colors = BUCKET_COLORS[currentRisk];
+  el.innerHTML = mults.map((m, i) =>
+    `<span style="background:${colors[i]}28;color:${colors[i]};border:1px solid ${colors[i]}55;
+      padding:2px 6px;border-radius:5px;font-size:9px;">${m}x</span>`
   ).join('');
 }
 renderMultDisplay();
 
-// Peg positions
+// ── PEG POSITIONS ────────────────────────────────────────────────────
 function pegPos(row, col) {
-  const offset = row % 2 === 0 ? 0 : STEP_X / 2;
-  const totalPegs = row % 2 === 0 ? COLS : COLS - 1;
-  const startX = PAD_X + offset;
-  return {
-    x: startX + col * STEP_X,
-    y: PAD_Y + row * STEP_Y
-  };
+  // Even rows: pegs at x = PAD_X + col*STEP_X (col 0..ROWS)
+  // Odd rows:  pegs at x = PAD_X + STEP_X/2 + col*STEP_X (col 0..ROWS-1)
+  const isEven = row % 2 === 0;
+  const x = isEven
+    ? PAD_X + col * STEP_X
+    : PAD_X + STEP_X / 2 + col * STEP_X;
+  const y = PAD_Y + row * STEP_Y;
+  return { x, y };
 }
 
-function drawBoard() {
-  ctx.clearRect(0, 0, W, H);
+// ── WAYPOINT PATH SIMULATION ──────────────────────────────────────────
+// Exact binomial distribution: at each row, ball goes left or right randomly.
+// Waypoints trace the actual peg-to-peg path.
+function buildBallPath() {
+  const decisions = [];
+  for (let i = 0; i < ROWS; i++) decisions.push(Math.random() < 0.5);
+  const bucket = decisions.filter(Boolean).length; // 0..ROWS
 
-  // Pegs
+  const waypoints = [];
+
+  // Start above center
+  waypoints.push({ x: CENTER_X + (Math.random() - 0.5) * 6, y: PAD_Y - 18 });
+
+  // At each row, ball hits the peg at its current column
+  let x = CENTER_X;
   for (let row = 0; row < ROWS; row++) {
-    const pegsInRow = row % 2 === 0 ? COLS : COLS - 1;
-    for (let col = 0; col < pegsInRow; col++) {
-      const {x, y} = pegPos(row, col);
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(139,92,246,0.6)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(167,139,250,0.3)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    const isEven = row % 2 === 0;
+    // Snap x to the nearest peg in this row
+    const pegX = isEven
+      ? Math.round((x - PAD_X) / STEP_X) * STEP_X + PAD_X
+      : Math.round((x - PAD_X - STEP_X / 2) / STEP_X) * STEP_X + PAD_X + STEP_X / 2;
+    const pegY = PAD_Y + row * STEP_Y;
+
+    // Small random jitter at peg for natural look
+    waypoints.push({
+      x: pegX + (Math.random() - 0.5) * 3,
+      y: pegY,
+    });
+
+    // Apply direction
+    x += decisions[row] ? STEP_X / 2 : -STEP_X / 2;
+  }
+
+  // Land in bucket center
+  const bucketCenterX = PAD_X + bucket * STEP_X + STEP_X / 2;
+  const bucketY = PAD_Y + ROWS * STEP_Y + BUCKET_H / 2 - 2;
+  waypoints.push({ x: bucketCenterX, y: bucketY });
+
+  return { waypoints, bucket, decisions };
+}
+
+// ── DRAWING ───────────────────────────────────────────────────────────
+function drawBoard() {
+  // Background
+  ctx.fillStyle = '#07070e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle dot grid
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  for (let gx = 0; gx < W; gx += 18)
+    for (let gy = 0; gy < H; gy += 18)
+      ctx.fillRect(gx, gy, 1.2, 1.2);
+
+  const bucketTopY = PAD_Y + ROWS * STEP_Y + 8;
+  const mults  = MULTS[currentRisk];
+  const colors = BUCKET_COLORS[currentRisk];
+
+  // ── BUCKETS ──
+  for (let i = 0; i < SLOTS; i++) {
+    const bx  = PAD_X + i * STEP_X;
+    const col = colors[i];
+    const flash = flashBuckets[i] || 0;
+
+    // Background fill
+    ctx.fillStyle = col + (flash > 0 ? Math.floor(Math.min(flash * 0.55, 0.45) * 255).toString(16).padStart(2,'0') : '18');
+    roundRect(ctx, bx + 2, bucketTopY, STEP_X - 4, BUCKET_H - 4, 7);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = col + (flash > 0 ? 'cc' : '55');
+    ctx.lineWidth   = flash > 0 ? 2 : 1;
+    roundRect(ctx, bx + 2, bucketTopY, STEP_X - 4, BUCKET_H - 4, 7);
+    ctx.stroke();
+
+    // Multiplier text
+    ctx.fillStyle   = flash > 0 ? col : col + 'cc';
+    ctx.font        = `bold ${mults[i] >= 100 ? 8 : mults[i] >= 10 ? 9 : 10}px monospace`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(mults[i] + 'x', bx + STEP_X / 2, bucketTopY + BUCKET_H / 2 - 2);
+
+    // Flash decay
+    if (flash > 0) {
+      flashBuckets[i] = flash * 0.88;
+      if (flashBuckets[i] < 0.01) delete flashBuckets[i];
     }
   }
 
-  // Bucket slots
-  const bucketY = PAD_Y + ROWS * STEP_Y + 12;
-  const mults = MULTS[currentRisk];
-  const colors = MULT_COLORS[currentRisk];
-  const bucketW = STEP_X - 4;
-  mults.forEach((m, i) => {
-    const bx = PAD_X + i * STEP_X - bucketW/2;
-    ctx.fillStyle = colors[i] + '22';
-    ctx.strokeStyle = colors[i] + '88';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(bx, bucketY, bucketW, 36, 6);
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = colors[i];
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('x' + m, PAD_X + i * STEP_X, bucketY + 22);
-  });
+  // ── PEGS ──
+  for (let row = 0; row < ROWS; row++) {
+    const isEven  = row % 2 === 0;
+    const pegCount = isEven ? ROWS + 1 : ROWS;
+    for (let col = 0; col < pegCount; col++) {
+      const { x, y } = pegPos(row, col);
 
-  // Balls
+      // Check proximity to any ball for glow
+      let nearestDist = Infinity;
+      balls.forEach(b => {
+        const d = Math.hypot(b.x - x, b.y - y);
+        if (d < nearestDist) nearestDist = d;
+      });
+      const proximity = Math.max(0, 1 - nearestDist / 60);
+
+      ctx.shadowColor = `rgba(139,92,246,${0.3 + proximity * 0.5})`;
+      ctx.shadowBlur  = 4 + proximity * 8;
+      ctx.beginPath();
+      ctx.arc(x, y, PEG_R, 0, Math.PI * 2);
+      ctx.fillStyle = proximity > 0.1
+        ? `rgba(200,180,255,${0.7 + proximity * 0.3})`
+        : 'rgba(139,92,246,0.75)';
+      ctx.fill();
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // ── BALLS ──
   balls.forEach(b => {
+    if (!b.trail) return;
+
+    // Trail
+    b.trail.forEach((t, i) => {
+      const a = (i / b.trail.length) * 0.35;
+      const r = BALL_R * (0.4 + i / b.trail.length * 0.6);
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(167,139,250,${a})`;
+      ctx.fill();
+    });
+
+    // Ball glow
+    ctx.shadowColor = 'rgba(167,139,250,0.9)';
+    ctx.shadowBlur  = 14;
+
+    // Ball gradient
+    const grad = ctx.createRadialGradient(b.x - 2, b.y - 2.5, 1.5, b.x, b.y, BALL_R);
+    grad.addColorStop(0,   '#ffffff');
+    grad.addColorStop(0.35,'#ddd5ff');
+    grad.addColorStop(1,   '#8b5cf6');
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 8, 0, Math.PI*2);
-    const grad = ctx.createRadialGradient(b.x-2, b.y-2, 1, b.x, b.y, 8);
-    grad.addColorStop(0, '#fff');
-    grad.addColorStop(1, b.color || '#a78bfa');
+    ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.shadowBlur = 0;
   });
 }
 
-function spawnBall(bet, userId) {
-  // Start near the top center with small random offset
-  const startX = W/2 + (Math.random()-0.5)*STEP_X*0.5;
-  const b = {
-    x: startX, y: PAD_Y - 20,
-    vx: (Math.random()-0.5)*0.5,
-    vy: 0,
-    bet, userId,
-    color: '#a78bfa',
-    done: false,
-    currentRow: -1,
-  };
-  balls.push(b);
+// Helper: rounded rect path
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x,     y + h, x,     y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x,     y,     x + r, y);
+  ctx.closePath();
 }
 
+// ── BALL UPDATE ───────────────────────────────────────────────────────
 function updateBalls() {
-  const bucketY = PAD_Y + ROWS * STEP_Y + 12;
-  const gravity = 0.22;
-  const BALL_R  = 8;
-  const PEG_R   = 5;
-
   balls.forEach(b => {
     if (b.done) return;
-    b.vy += gravity;
-    b.x  += b.vx;
-    b.y  += b.vy;
 
-    // Peg collisions
-    for (let row = 0; row < ROWS; row++) {
-      const pegsInRow = row % 2 === 0 ? COLS : COLS - 1;
-      for (let col = 0; col < pegsInRow; col++) {
-        const p = pegPos(row, col);
-        const dx = b.x - p.x, dy = b.y - p.y;
-        const dist = Math.sqrt(dx*dx+dy*dy);
-        if (dist < BALL_R + PEG_R + 1) {
-          // Bounce: reflect velocity + random nudge
-          const nx = dx/dist, ny = dy/dist;
-          const speed = Math.sqrt(b.vx*b.vx+b.vy*b.vy);
-          b.vx = nx * speed * 0.6 + (Math.random()-0.5)*1.2;
-          b.vy = Math.abs(ny * speed * 0.6) + 1;
-          // Separate
-          b.x = p.x + nx*(BALL_R+PEG_R+1);
-          b.y = p.y + ny*(BALL_R+PEG_R+1);
-        }
+    // Store trail
+    if (!b.trail) b.trail = [];
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > 7) b.trail.shift();
+
+    // Move toward next waypoint using smoothstep
+    const wp   = b.waypoints;
+    const next = wp[b.wpIdx + 1];
+    if (!next) { b.done = true; return; }
+
+    // Speed increases with row (gravity feel)
+    const rowProgress = b.wpIdx / ROWS;
+    const speed = 0.045 + rowProgress * 0.055 + Math.random() * 0.012;
+    b.t += speed;
+
+    if (b.t >= 1) {
+      b.t -= 1;
+      b.wpIdx++;
+      if (b.wpIdx >= wp.length - 1) {
+        b.x = wp[wp.length - 1].x;
+        b.y = wp[wp.length - 1].y;
+        b.done = true;
+        finalizeBall(b);
+        return;
       }
     }
 
-    // Wall bounces
-    if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx); }
-    if (b.x > W-BALL_R) { b.x = W-BALL_R; b.vx = -Math.abs(b.vx); }
-
-    // Landed in bucket
-    if (b.y >= bucketY + 10) {
-      b.done = true;
-      // Which slot?
-      const mults = MULTS[currentRisk];
-      const slotIdx = Math.max(0, Math.min(mults.length-1,
-        Math.floor((b.x - PAD_X + STEP_X/2) / STEP_X)
-      ));
-      const mult = mults[slotIdx];
-      const win  = Math.floor(b.bet * mult);
-      finalizeBall(b, mult, win, slotIdx);
-    }
+    // Smoothstep interpolation
+    const t  = Math.max(0, Math.min(1, b.t));
+    const s  = t * t * (3 - 2 * t);
+    const from = wp[b.wpIdx];
+    const to   = wp[b.wpIdx + 1];
+    b.x = from.x + (to.x - from.x) * s;
+    b.y = from.y + (to.y - from.y) * s;
   });
 
-  balls = balls.filter(b => !b.done || b._keepFrames-- > 0);
+  balls = balls.filter(b => !b.done);
 }
 
-async function finalizeBall(b, mult, win, slotIdx) {
+// ── FINALIZE ─────────────────────────────────────────────────────────
+async function finalizeBall(b) {
+  const mults = MULTS[currentRisk];
+  const mult  = mults[b.bucket];
+  const win   = Math.floor(b.bet * mult);
+  const profit = win - b.bet;
+
   pkBalls++;
   document.getElementById('pk-balls').textContent = pkBalls;
 
-  const profit = win - b.bet;
-  const isWin  = mult >= 1;
+  // Flash bucket
+  flashBuckets[b.bucket] = 1.2;
 
+  // Credit winnings
   if (win > 0) {
     try {
-      await window.fs.updateDoc(window.fs.doc(window.db_online,"users",b.userId),{balance:window.fs.increment(win)});
-    } catch(e){}
+      await window.fs.updateDoc(
+        window.fs.doc(window.db_online, 'users', activeUser),
+        { balance: window.fs.increment(win) }
+      );
+    } catch(e) {}
     balance += win;
-    if(typeof updateBalanceDisplay==="function") updateBalanceDisplay(balance);
-  }
-  if(typeof updateGlobalStats==="function") updateGlobalStats(profit, isWin, true);
-  if(typeof addToLogs==="function") {
-    const c = profit>=0?"#22c55e":"#ef4444";
-    addToLogs(`BALLE: x${mult} → ${profit>=0?'+':''}${profit} coins`, c);
+    if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay(balance);
   }
 
-  if (mult >= 5) {
+  // Stats (single call with net profit)
+  if (typeof updateGlobalStats === 'function') updateGlobalStats(profit, profit > 0, true);
+  if (typeof addToLogs === 'function') {
+    const col = profit >= 0 ? '#22c55e' : '#ef4444';
+    addToLogs(`BALLE: x${mult} → ${profit >= 0 ? '+' : ''}${profit} coins`, col);
+  }
+
+  // Track session wins (only count mult >= 1 as "win")
+  if (mult >= 1) {
     pkWins++;
-    if (mult > pkBest) { pkBest=mult; document.getElementById('pk-best').textContent='x'+mult; }
     document.getElementById('pk-wins').textContent = pkWins;
-    if(typeof showNotification==="function") showNotification(`x${mult} ! +${win} coins !`,"success");
+  }
+  if (mult > pkBest) {
+    pkBest = mult;
+    document.getElementById('pk-best').textContent = 'x' + mult;
   }
 
-  // Flash result
+  // History chips
+  historyResults.unshift({ mult, profit });
+  if (historyResults.length > 10) historyResults.pop();
+  renderHistory();
+
+  // Result flash
   const res = document.getElementById('plinko-result');
-  res.textContent = profit>=0 ? `+${win} coins (x${mult})` : `-${b.bet} coins`;
-  res.style.color  = profit>=0 ? '#22c55e' : '#ef4444';
-  res.style.opacity='1';
-  setTimeout(()=>res.style.opacity='0', 1500);
+  res.textContent = profit >= 0 ? `+${win} coins (x${mult})` : `-${b.bet} coins (x${mult})`;
+  res.style.color   = profit >= 0 ? '#22c55e' : '#ef4444';
+  res.style.opacity = '1';
+  setTimeout(() => { res.style.opacity = '0'; }, 2000);
 
-  if(balance<=0 && typeof showNotification==="function") showNotification("Solde epuise !","error");
+  // Big win notification
+  if (mult >= 10 && typeof showNotification === 'function') {
+    showNotification(`x${mult} ! +${win} coins`, 'success');
+  }
 }
 
+// ── HISTORY ──────────────────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('hist-row');
+  if (!el) return;
+  el.innerHTML = historyResults.map(h => {
+    const col = h.mult >= 10 ? '#fbbf24' : h.profit > 0 ? '#22c55e' : '#ef4444';
+    const label = h.mult >= 100 ? '!!!' : h.mult >= 10 ? '!!' : h.mult >= 1 ? '+' : '-';
+    return `<div class="hist-chip" title="x${h.mult}" style="background:${col}22;color:${col};border:1px solid ${col}55;">${label}</div>`;
+  }).join('');
+}
+
+// ── DROP BALL ─────────────────────────────────────────────────────────
 async function dropBall() {
-  const userId = localStorage.getItem('active_session');
-  if (!userId) return;
+  if (!activeUser) return;
   const bet = parseInt(document.getElementById('plinko-bet').value);
-  if (isNaN(bet)||bet<1) return;
-  if (bet > balance) { if(typeof showNotification==="function") showNotification("Solde insuffisant !","error"); return; }
+  if (isNaN(bet) || bet < 1) return;
+  if (bet > balance) {
+    if (typeof showNotification === 'function') showNotification('Solde insuffisant !', 'error');
+    return;
+  }
+  if (balls.length >= 8) {
+    if (typeof showNotification === 'function') showNotification('Max 8 balles en vol !', 'error');
+    return;
+  }
 
-  // Deduct
+  // Deduct immediately
   try {
-    await window.fs.updateDoc(window.fs.doc(window.db_online,"users",userId),{balance:window.fs.increment(-bet)});
-  } catch(e){}
+    await window.fs.updateDoc(
+      window.fs.doc(window.db_online, 'users', activeUser),
+      { balance: window.fs.increment(-bet) }
+    );
+  } catch(e) {}
   balance -= bet;
-  if(typeof updateBalanceDisplay==="function") updateBalanceDisplay(balance);
-  if(typeof updateGlobalStats==="function") updateGlobalStats(-bet,false,false);
+  if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay(balance);
 
-  spawnBall(bet, userId);
+  // Build path and spawn ball
+  const { waypoints, bucket } = buildBallPath();
+  balls.push({
+    x: waypoints[0].x,
+    y: waypoints[0].y,
+    waypoints,
+    bucket,
+    wpIdx: 0,
+    t: 0,
+    trail: [],
+    bet,
+    done: false,
+  });
 }
 
-// Game loop
+// ── AUTO-BET ─────────────────────────────────────────────────────────
+let autoBetInterval = null;
+function toggleAutoBet() {
+  const btn = document.getElementById('auto-btn');
+  if (autoBetInterval) {
+    clearInterval(autoBetInterval);
+    autoBetInterval = null;
+    btn.textContent = 'Auto';
+    btn.classList.remove('bg-[#ef4444]/20','border-[#ef4444]/40','text-[#ef4444]');
+    btn.classList.add('bg-[#0F0F12]','border-[#1f1f21]','text-zinc-400');
+  } else {
+    btn.textContent = 'Stop';
+    btn.classList.add('bg-[#ef4444]/20','border-[#ef4444]/40','text-[#ef4444]');
+    btn.classList.remove('bg-[#0F0F12]','border-[#1f1f21]','text-zinc-400');
+    autoBetInterval = setInterval(() => {
+      if (balance <= 0) { toggleAutoBet(); return; }
+      dropBall();
+    }, 420);
+  }
+}
+
+// ── GAME LOOP ─────────────────────────────────────────────────────────
 function loop() {
   updateBalls();
   drawBoard();

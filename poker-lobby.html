@@ -501,7 +501,7 @@ function renderTables() {
         const pCount   = Object.keys(players).length;
         const maxP     = t.maxPlayers || 6;
         const isFull   = pCount >= maxP;
-        const imSeated = !!players[ME];
+        const imSeated = ME ? !!players[ME] : false;
         const isPlaying = t.status === 'playing';
         const stake    = stakeLevel(t.blindBig || 10);
 
@@ -619,6 +619,7 @@ window.setVis = function(v) {
 };
 
 window.createTable = async function() {
+    if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     const name  = document.getElementById('c-name').value.trim() || `Table de ${ME}`;
     const sb    = parseInt(document.getElementById('c-sb').value)    || 5;
     const bb    = parseInt(document.getElementById('c-bb').value)    || 10;
@@ -672,6 +673,7 @@ window.createTable = async function() {
 
 // ── JOIN TABLE ────────────────────────────────────────────
 window.openJoin = function(t) {
+    if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     if ((t.players||{})[ME]) { window.location.href = `poker.html?table=${t.id}`; return; }
     selTableId = t.id; selTable = t;
     document.getElementById('j-name').textContent    = t.name||'Table sans nom';
@@ -705,6 +707,7 @@ window.closeJoin = function() {
 };
 
 window.confirmJoin = async function() {
+    if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     if (!selTableId||!selTable) return;
     const amount = parseInt(document.getElementById('j-amount').value);
     const pw     = document.getElementById('j-pw').value.trim();
