@@ -675,6 +675,7 @@ window.createTable = async function() {
 
 // ── JOIN TABLE ────────────────────────────────────────────
 window.openJoin = function(t) {
+    console.log('openJoin called, ME=', ME, 't=', t);
     if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     if ((t.players||{})[ME]) { window.location.href = `poker.html?table=${t.id}`; return; }
     selTableId = t.id; selTable = t;
@@ -709,6 +710,7 @@ window.closeJoin = function() {
 };
 
 window.confirmJoin = async function() {
+    console.log('confirmJoin called, ME=', ME, 'selTableId=', selTableId);
     if (!selTableId||!selTable) return;
     const amount = parseInt(document.getElementById('j-amount').value);
     const pw     = document.getElementById('j-pw').value.trim();
@@ -753,7 +755,12 @@ async function doJoin(tableId, buyIn) {
 
         notify(`✅ Tu as rejoint la table avec ${buyIn} coins !`, 'success');
         setTimeout(() => { window.location.href = `poker.html?table=${tableId}`; }, 800);
-    } catch(e) { notify(e.message, 'error'); }
+    } catch(e) {
+        console.error('doJoin error:', e);
+        // Affiche le stack complet dans la notification
+        const stack = e.stack ? e.stack.split('\n').slice(0,4).join(' | ') : 'no stack';
+        notify('ERREUR: ' + e.message + ' — ' + stack, 'error');
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────
