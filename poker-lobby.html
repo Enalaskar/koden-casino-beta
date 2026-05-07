@@ -461,15 +461,18 @@ function listenTables() {
             if (t.status === 'playing') inGame++;
         });
 
-        document.getElementById('s-tables')?.textContent  = allTables.length;
-        document.getElementById('s-players')?.textContent = totalP;
+        const elTables  = document.getElementById('s-tables');
+        const elPlayers = document.getElementById('s-players');
+        const elGames   = document.getElementById('s-games');
+        const elOnline  = document.getElementById('online-count');
+        if (elTables)  elTables.textContent  = allTables.length;
+        if (elPlayers) elPlayers.textContent = totalP;
+        if (elGames)   elGames.textContent   = inGame;
+        if (elOnline)  elOnline.textContent  = `${totalP} joueur${totalP !== 1 ? 's' : ''} en ligne`;
         // After snapshot, pre-fetch all player pics then re-render
         const allPlayerNames = new Set();
         allTables.forEach(t => Object.keys(t.players||{}).forEach(n => allPlayerNames.add(n)));
         Promise.all([...allPlayerNames].map(n => fetchPlayerPic(n))).then(() => renderTables(allTables));
-        document.getElementById('s-games')?.textContent   = inGame;
-        document.getElementById('online-count')?.textContent =
-            `${totalP} joueur${totalP !== 1 ? 's' : ''} en ligne`;
 
         renderTables();
     });
