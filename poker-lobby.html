@@ -400,7 +400,7 @@ function avatarHTML(username) {
 
 // ── Boot ──────────────────────────────────────────────────
 async function init() {
-    document.getElementById('nav-username').textContent = ME;
+    safeSet('nav-username', 'textContent', ME);
 
     // Load user balance + profilePic
     try {
@@ -436,9 +436,9 @@ async function init() {
 }
 
 function setBalanceUI(b) {
-    document.getElementById('nav-balance').textContent = parseFloat(b).toFixed(2);
-    document.getElementById('c-bal').textContent       = parseFloat(b).toFixed(2);
-    document.getElementById('j-bal').textContent       = parseFloat(b).toFixed(2);
+    safeSet('nav-balance', 'textContent', parseFloat(b).toFixed(2));
+    safeSet('c-bal', 'textContent', parseFloat(b).toFixed(2));
+    safeSet('j-bal', 'textContent', parseFloat(b).toFixed(2));
 }
 
 // ── Listen to tables (real-time) ──────────────────────────
@@ -480,7 +480,7 @@ function listenTables() {
 
 // ── Render table cards ────────────────────────────────────
 function renderTables() {
-    document.getElementById('empty-loader').style.display = 'none';
+    const _el = document.getElementById('empty-loader'); if (_el) _el.style.display = 'none';
     const list = document.getElementById('tables-list');
     list.style.display = 'grid';
 
@@ -584,18 +584,18 @@ function stakeLabel(l) { return {low:'🟢 Micro',mid:'🟡 Moyen',high:'🔴 Ha
 window.filter = function(f) {
     curFilter = f;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-'+f).classList.add('active');
+    safeClass('tab-'+f, 'add', 'active');
     renderTables();
 };
 
 // ── CREATE TABLE ──────────────────────────────────────────
 window.openCreate = function() {
-    document.getElementById('c-bal').textContent = parseFloat(balance).toFixed(2);
-    document.getElementById('create-modal').classList.remove('hidden');
+    safeSet('c-bal', 'textContent', parseFloat(balance).toFixed(2));
+    safeClass('create-modal', 'remove', 'hidden');
 };
 window.closeCreate = function() {
-    document.getElementById('create-modal').classList.add('hidden');
-    document.getElementById('c-err').classList.add('hidden');
+    safeClass('create-modal', 'add', 'hidden');
+    safeClass('c-err', 'add', 'hidden');
 };
 
 function buildPlayersSelector() {
@@ -616,9 +616,9 @@ function buildPlayersSelector() {
 
 window.setVis = function(v) {
     visibility = v;
-    document.getElementById('v-pub').className  = 'vis-btn' + (v==='public'?' sel-pub':'');
-    document.getElementById('v-priv').className = 'vis-btn' + (v==='private'?' sel-priv':'');
-    document.getElementById('pw-field').classList.toggle('hidden', v !== 'private');
+    safeSet('v-pub', 'className', 'vis-btn' + (v==='public'?' sel-pub':''));
+    safeSet('v-priv', 'className', 'vis-btn' + (v==='private'?' sel-priv':''));
+    safeClass('pw-field', 'toggle', 'hidden', v !== 'private');
 };
 
 window.createTable = async function() {
@@ -678,16 +678,16 @@ window.openJoin = function(t) {
     if (!ME) { notify('Tu dois être connecté.', 'error'); return; }
     if ((t.players||{})[ME]) { window.location.href = `poker.html?table=${t.id}`; return; }
     selTableId = t.id; selTable = t;
-    document.getElementById('j-name').textContent    = t.name||'Table sans nom';
-    document.getElementById('j-amount').value        = t.buyInMin||100;
-    document.getElementById('j-info').textContent    = `Minimum : ${t.buyInMin||100} coins — Blinds : ${t.blindSmall}/${t.blindBig}`;
-    document.getElementById('j-bal').textContent     = parseFloat(balance).toFixed(2);
-    document.getElementById('j-pw-wrap').classList.toggle('hidden', t.visibility !== 'private');
-    document.getElementById('j-pw').value = '';
-    document.getElementById('j-err').classList.add('hidden');
+    safeSet('j-name', 'textContent', t.name||'Table sans nom');
+    safeSet('j-amount', 'value', t.buyInMin||100);
+    safeSet('j-info', 'textContent',    = `Minimum : ${t.buyInMin||100} coins — Blinds : ${t.blindSmall}/${t.blindBig}`;
+    safeSet('j-bal', 'textContent', parseFloat(balance).toFixed(2));
+    safeClass('j-pw-wrap', 'toggle', 'hidden', t.visibility !== 'private');
+    safeSet('j-pw', 'value', '');
+    safeClass('j-err', 'add', 'hidden');
 
     const pCount = Object.keys(t.players||{}).length;
-    document.getElementById('j-stats').innerHTML = `
+    const _jstats = document.getElementById('j-stats'); if(_jstats) _jstats.innerHTML = `
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
             <p style="font-size:7px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Joueurs</p>
             <p style="font-size:18px;font-weight:800;color:var(--green);">${pCount}/${t.maxPlayers}</p>
@@ -700,11 +700,11 @@ window.openJoin = function(t) {
             <p style="font-size:7px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Statut</p>
             <p style="font-size:10px;font-weight:800;color:${t.status==='playing'?'var(--green)':'var(--gold)'};">${t.status==='playing'?'En cours':'Attente'}</p>
         </div>`;
-    document.getElementById('join-modal').classList.remove('hidden');
+    safeClass('join-modal', 'remove', 'hidden');
 };
 
 window.closeJoin = function() {
-    document.getElementById('join-modal').classList.add('hidden');
+    safeClass('join-modal', 'add', 'hidden');
     selTableId = null; selTable = null;
 };
 
@@ -772,7 +772,9 @@ window.notify = function(msg, type='info') {
 
 // Close modals on backdrop click
 ['create-modal','join-modal'].forEach(id => {
-    document.getElementById(id).addEventListener('click', function(e) {
+    const _mel = document.getElementById(id);
+    if (!_mel) return;
+    _mel.addEventListener('click', function(e) {
         if (e.target===this) { id==='create-modal' ? closeCreate() : closeJoin(); }
     });
 });
