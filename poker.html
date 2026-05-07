@@ -768,12 +768,11 @@ window.playerAction = async function(type) {
     // Advance turn
     const activePlayers = Object.keys(newPlayers).filter(n => newPlayers[n].status !== 'folded' && newPlayers[n].chips > 0);
     const allKeys       = Object.keys(newPlayers);
-    const rawIdx        = ME ? allKeys.indexOf(ME) : -1;
-    const curIdx        = rawIdx === -1 ? 0 : rawIdx;
+    const _rawIdx       = (ME && allKeys.indexOf(ME) !== -1) ? allKeys.indexOf(ME) : 0;
     let   nextTurn      = null;
 
     for (let i=1; i<=allKeys.length; i++) {
-        const candidate = allKeys[(curIdx+i)%allKeys.length];
+        const candidate = allKeys[(_rawIdx+i)%allKeys.length];
         if (candidate && newPlayers[candidate] && newPlayers[candidate].status !== 'folded') { nextTurn = candidate; break; }
     }
 
@@ -802,8 +801,8 @@ async function advancePhase(gs, players) {
     }
 
     const phases = ['preflop','flop','turn','river','showdown'];
-    const curIdx = phases.indexOf(gs.phase);
-    const nextPh = phases[curIdx+1] || 'showdown';
+    const _phIdx = gs.phase ? phases.indexOf(gs.phase) : -1;
+    const nextPh = (_phIdx !== -1 && phases[_phIdx+1]) ? phases[_phIdx+1] : 'showdown';
 
     gs.lastActions  = {};
     gs.bets         = {};
@@ -828,11 +827,11 @@ async function advancePhase(gs, players) {
 
     // Set first active player after dealer as next turn
     const allKeys   = Object.keys(players);
-    const dealerIdx = (gs.dealer && allKeys.indexOf(gs.dealer) !== -1) ? allKeys.indexOf(gs.dealer) : 0;
-    let nextTurn    = allKeys[(dealerIdx+1)%allKeys.length];
+    const _dIdx     = (gs.dealer && allKeys.indexOf(gs.dealer) !== -1) ? allKeys.indexOf(gs.dealer) : 0;
+    let nextTurn    = allKeys[(_dIdx+1)%allKeys.length];
     for (let i=0; i<allKeys.length; i++) {
-        const c = allKeys[(dealerIdx+1+i)%allKeys.length];
-        if (c && players[c] && players[c].status !== 'folded') { nextTurn = c; break; }
+        const _c = allKeys[(_dIdx+1+i)%allKeys.length];
+        if (_c && players[_c] && players[_c].status !== 'folded') { nextTurn = _c; break; }
     }
     gs.currentTurn = nextTurn;
 
