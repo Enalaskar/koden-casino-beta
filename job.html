@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+    <title>KODEN | Jacks or Better</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getFirestore, doc, getDoc, updateDoc, increment, setDoc, deleteDoc, collection,
+            query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, getDocs 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBzucz2akqXT-LQ5ENHqz3U2yaJciJmM04",
+            authDomain: "koden-casino.firebaseapp.com",
+            projectId: "koden-casino",
+            storageBucket: "koden-casino.firebasestorage.app",
+            messagingSenderId: "730117054841",
+            appId: "1:730117054841:web:e34b5b14fd825d9ce2cfa8",
+            measurementId: "G-8BDP8RLVB3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.db_online = getFirestore(app);
+        window.fs = { doc, getDoc, updateDoc, increment, setDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, getDocs };
+        console.log("Koden_System: Jacks or Better Firebase OK.");
+    </script>
+    <style>
+        .card-poker {
+            width: 90px;
+            height: 130px;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+        }
+        .card-poker:hover:not(.card-back):not(.card-locked) {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 30px rgba(0,0,0,0.7);
+        }
+        .card-poker.held-card {
+            transform: translateY(-18px);
+            box-shadow: 0 0 0 3px #22c55e, 0 20px 40px rgba(34,197,94,0.3);
+        }
+        .card-poker.card-back {
+            background: linear-gradient(135deg, #141417 0%, #1f1f28 50%, #141417 100%);
+            border: 1px solid rgba(139,92,246,0.3);
+            cursor: default;
+        }
+        .card-poker.card-locked { cursor: default; }
+
+        .card-corner { font-size: 0.75rem; font-weight: 900; line-height: 1; }
+        .card-center { font-size: 2rem; text-align: center; align-self: center; }
+        .card-corner-bottom { transform: rotate(180deg); align-self: flex-end; }
+
+        .card-red   { color: #ef4444; }
+        .card-black { color: #111111; }
+
+        @keyframes dealCard {
+            from { transform: translateY(-100px) rotate(var(--rot, -5deg)); opacity: 0; }
+            to   { transform: translateY(0) rotate(0); opacity: 1; }
+        }
+        .deal-anim { animation: dealCard 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 0; }
+
+        @keyframes holdBadge {
+            from { transform: translateY(10px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        .hold-badge { animation: holdBadge 0.2s ease forwards; }
+
+        @keyframes resultSlide {
+            from { transform: translateY(-20px); opacity: 0; }
+            to   { transform: translateY(0);     opacity: 1; }
+        }
+        .result-slide { animation: resultSlide 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        .pay-row-highlight {
+            background: rgba(139,92,246,0.15);
+            border-radius: 6px;
+            border-left: 2px solid #8b5cf6;
+        }
+    </style>
+    <link rel="stylesheet" href="mobile.css">
+</head>
+<body class="h-screen bg-[#0F0F12] text-white overflow-hidden font-sans flex flex-col p-4 gap-4">
+    <!-- ========= KODEN LOADING SCREEN ========= -->
+    <div id="koden-loader">
+        <div class="loader-scanline"></div>
+
+        <div class="loader-logo">
+            <div class="loader-logo-bar"></div>
+            Koden
+        </div>
+
+        <div class="loader-ring">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle class="loader-ring-track" cx="32" cy="32" r="28" stroke-width="5"/>
+                <circle class="loader-ring-fill"  cx="32" cy="32" r="28" stroke-width="5"
+                    stroke-dasharray="176" stroke-dashoffset="44"
+                    transform="rotate(-90 32 32)"/>
+            </svg>
+        </div>
+
+        <div class="loader-progress-wrap">
+            <div class="loader-bar-bg">
+                <div class="loader-bar-fill" id="loader-bar"></div>
+            </div>
+            <div class="loader-status" id="loader-status-text">Initialisation...</div>
+        </div>
+    </div>
+    <!-- ========= END LOADER ========= -->
+
+
+    <!-- NAV -->
+    <nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl relative">
+        <div class="flex items-center gap-6">
+            <a href="index.html" class="flex items-center gap-2 group">
+                <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
+                <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
+            </a>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
+                <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
+                <span class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
+            </div>
+            <div class="relative">
+                <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all duration-300 group relative">
+                    <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                        <img id="display-pp" src="" class="w-full h-full object-cover hidden" alt="pp">
+                        <span id="display-emoji" class="text-base opacity-50">👤</span>
+                    </div>
+                    <div class="flex flex-col items-start leading-none gap-1">
+                        <div class="flex items-center gap-1.5">
+                            <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">User</span>
+                            <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
+                        </div>
+                        <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-zinc-600 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[100] animate-fadeIn">
+                    <div class="flex flex-col gap-5">
+                        <div class="text-center border-b border-[#1f1f21] pb-4">
+                            <p class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">User_Terminal</p>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all mb-2">Modifier la Photo (URL)</button>
+                            <button onclick="logout()" class="w-full bg-[#1c1c21] border border-zinc-800 text-zinc-300 font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-white/5 transition-all">Se Déconnecter</button>
+                            <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 border border-[#ef4444]/20 text-[#ef4444] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer le compte</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex gap-4 overflow-hidden">
+
+        <!-- LEFT: Paytable + controls -->
+        <aside class="w-72 bg-[#141417] border border-[#1f1f21] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl shrink-0">
+            <div>
+                <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3">Paytable — Jacks or Better</p>
+                <div class="space-y-1 text-[10px] font-bold" id="paytable-rows">
+                    <div class="flex justify-between px-2 py-1.5" id="pt-royal">   <span>Royal Flush</span>         <span class="text-[#fbbf24]">×800</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-sf">      <span>Quinte Flush</span>        <span class="text-[#a78bfa]">×50</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-4k">      <span>Carré</span>               <span class="text-[#a78bfa]">×25</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-fh">      <span>Full House</span>          <span class="text-[#22c55e]">×9</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-flush">   <span>Couleur</span>             <span class="text-[#22c55e]">×6</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-straight"><span>Suite</span>               <span class="text-zinc-300">×4</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-3k">      <span>Brelan</span>              <span class="text-zinc-300">×3</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-2p">      <span>Double Paire</span>        <span class="text-zinc-300">×2</span></div>
+                    <div class="flex justify-between px-2 py-1.5" id="pt-jb">      <span>Paire (J-A)</span>         <span class="text-zinc-500">×1</span></div>
+                </div>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4 space-y-3">
+                <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block">Mise</label>
+                <input id="poker-bet" type="number" value="10" min="1" step="1"
+                    class="w-full bg-[#0F0F12] border border-[#1f1f21] rounded-xl p-4 text-sm font-bold outline-none focus:border-[#fbbf24]/50 transition-all text-white">
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setPokerBet(10)"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">10</button>
+                    <button onclick="setPokerBet(50)"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">50</button>
+                    <button onclick="setPokerBet(100)" class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">100</button>
+                </div>
+            </div>
+
+            <!-- Session stats -->
+            <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4 space-y-2">
+                <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2">Session</p>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Mains</span><span id="poker-stat-hands" class="font-mono font-bold">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Victoires</span><span id="poker-stat-wins" class="font-mono font-bold text-[#22c55e]">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Meilleure main</span><span id="poker-stat-best" class="font-mono font-bold text-[#fbbf24] text-[9px]">—</span></div>
+            </div>
+
+            <!-- Logs -->
+            <div class="flex-1 flex flex-col min-h-0 border-t border-zinc-800 pt-4">
+                <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">System_Logs</label>
+                <div id="logs-container" class="flex-1 bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4 overflow-y-auto space-y-2 font-mono text-[10px] custom-scroll"></div>
+            </div>
+        </aside>
+
+        <!-- GAME AREA -->
+        <section class="flex-1 bg-[#141417] border border-[#1f1f21] rounded-3xl p-8 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden">
+            
+            <div class="absolute inset-0 pointer-events-none opacity-5">
+                <div class="absolute top-1/3 left-1/3 w-72 h-72 rounded-full bg-[#8b5cf6] blur-[100px]"></div>
+            </div>
+
+            <div class="mb-8 text-center z-10">
+                <h1 class="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em] italic mb-1">Jacks or Better</h1>
+                <p class="text-2xl font-black italic tracking-tighter uppercase">Koden<span class="text-[#8b5cf6]">_</span>Poker</p>
+            </div>
+
+            <!-- Cards area -->
+            <div id="cards-area" class="flex gap-4 justify-center mb-6 z-10">
+                <!-- 5 card backs initially -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="card-poker card-back"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <div class="card-poker card-back"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <div class="card-poker card-back"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <div class="card-poker card-back"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <div class="card-poker card-back"></div>
+                </div>
+            </div>
+
+            <!-- Game result -->
+            <div id="poker-result" class="min-h-[40px] mb-6 z-10 text-center">
+                <p class="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Appuyez sur DEAL pour commencer</p>
+            </div>
+
+            <!-- Phase indicator -->
+            <div id="phase-hint" class="text-[9px] font-black text-zinc-700 uppercase tracking-widest mb-4 z-10 hidden">
+                Cliquez sur les cartes à garder, puis DRAW
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-4 z-10">
+                <button id="deal-btn" onclick="pokerDeal()"
+                    class="bg-[#8b5cf6] hover:brightness-110 active:scale-95 text-black font-black py-4 px-10 rounded-2xl uppercase italic tracking-tighter transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+                    Deal
+                </button>
+                <button id="draw-btn" onclick="pokerDraw()" disabled
+                    class="bg-[#fbbf24] text-black font-black py-4 px-10 rounded-2xl uppercase italic tracking-tighter transition-all shadow-[0_0_20px_rgba(251,191,36,0.3)] disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110 active:scale-95">
+                    Draw
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="h-10 bg-[#141417] border border-[#1f1f21] rounded-xl shrink-0 flex items-center justify-between px-6 text-[9px] font-mono shadow-lg">
+        <span class="text-[#22c55e] font-bold animate-pulse">● POKER_ENGINE_ACTIVE</span>
+        <span class="text-zinc-700">| RTP_99.54% | VER_1.0.0 |</span>
+    </footer>
+
+    <div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script src="script.js"></script>
+    <script>
+    // ===== Jacks or Better GAME LOGIC =====
+
+    const SUITS = ['♠','♥','♦','♣'];
+    const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+    const RANK_VALUES = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+    const RED_SUITS = ['♥','♦'];
+
+    let pokerDeck    = [];
+    let pokerHand    = [];
+    let heldCards    = new Set();
+    let pokerPhase   = 'deal'; // 'deal' | 'hold' | 'result'
+    let currentBet   = 10;
+    let sessionHands = 0, sessionWinsP = 0, bestHandName = '—';
+
+    function setPokerBet(v) { document.getElementById('poker-bet').value = v; }
+
+    function buildDeck() {
+        const deck = [];
+        SUITS.forEach(s => RANKS.forEach(r => deck.push({ suit: s, rank: r })));
+        return shuffle(deck);
+    }
+    function shuffle(a) {
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+
+    function cardHTML(card, index) {
+        const isRed = RED_SUITS.includes(card.suit);
+        const colorClass = isRed ? 'card-red' : 'card-black';
+        return `
+            <div class="card-poker ${colorClass} deal-anim" style="--rot:${(index - 2) * 3}deg; animation-delay:${index * 80}ms;"
+                 onclick="toggleHold(${index})" id="card-${index}">
+                <div class="card-corner">${card.rank}<br>${card.suit}</div>
+                <div class="card-center">${card.suit}</div>
+                <div class="card-corner card-corner-bottom">${card.rank}<br>${card.suit}</div>
+            </div>`;
+    }
+
+    function renderHand(hand, showHold = false) {
+        const area = document.getElementById('cards-area');
+        area.innerHTML = '';
+        hand.forEach((card, i) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col items-center gap-2';
+            
+            // Hold badge
+            const badge = document.createElement('div');
+            badge.className = 'h-5 text-[9px] font-black uppercase tracking-widest';
+            if (showHold && heldCards.has(i)) {
+                badge.innerHTML = `<span class="text-[#22c55e] hold-badge">HOLD</span>`;
+            }
+            
+            wrapper.innerHTML = cardHTML(card, i);
+            wrapper.insertBefore(badge, wrapper.firstChild);
+            
+            // Apply held class
+            if (heldCards.has(i)) {
+                setTimeout(() => {
+                    const el = document.getElementById(`card-${i}`);
+                    if (el) el.classList.add('held-card');
+                }, 50);
+            }
+            area.appendChild(wrapper);
+        });
+    }
+
+    function toggleHold(index) {
+        if (pokerPhase !== 'hold') return;
+        if (heldCards.has(index)) heldCards.delete(index);
+        else heldCards.add(index);
+        renderHand(pokerHand, true);
+    }
+
+    // Hand evaluation
+    function evaluateHand(hand) {
+        const ranks  = hand.map(c => RANK_VALUES[c.rank]).sort((a,b) => a-b);
+        const suits  = hand.map(c => c.suit);
+        const counts = {};
+        hand.forEach(c => counts[RANK_VALUES[c.rank]] = (counts[RANK_VALUES[c.rank]] || 0) + 1);
+        const vals   = Object.values(counts).sort((a,b) => b-a);
+
+        const isFlush    = suits.every(s => s === suits[0]);
+        const isAceLow   = ranks.join(',') === '2,3,4,5,14';
+        const isStraight = (ranks[4] - ranks[0] === 4 && vals[0] === 1) || isAceLow;
+        const isRoyal    = isFlush && isStraight && ranks.includes(14) && ranks.includes(13);
+
+        if (isRoyal)                        return { name: 'Royal Flush',   mult: 800, id: 'pt-royal'    };
+        if (isFlush && isStraight)          return { name: 'Quinte Flush',  mult: 50,  id: 'pt-sf'       };
+        if (vals[0] === 4)                  return { name: 'Carré',         mult: 25,  id: 'pt-4k'       };
+        if (vals[0] === 3 && vals[1] === 2) return { name: 'Full House',    mult: 9,   id: 'pt-fh'       };
+        if (isFlush)                        return { name: 'Couleur',        mult: 6,   id: 'pt-flush'    };
+        if (isStraight)                     return { name: 'Suite',          mult: 4,   id: 'pt-straight' };
+        if (vals[0] === 3)                  return { name: 'Brelan',         mult: 3,   id: 'pt-3k'       };
+        if (vals[0] === 2 && vals[1] === 2) return { name: 'Double Paire',   mult: 2,   id: 'pt-2p'       };
+        if (vals[0] === 2) {
+            // pair of Jacks or better (J=11)
+            const pairRank = parseInt(Object.keys(counts).find(r => counts[r] === 2));
+            if (pairRank >= 11)             return { name: 'Paire (J-A)',    mult: 1,   id: 'pt-jb'       };
+        }
+        return { name: null, mult: 0, id: null };
+    }
+
+    function highlightPaytable(id) {
+        document.querySelectorAll('#paytable-rows > div').forEach(el => el.classList.remove('pay-row-highlight'));
+        if (id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('pay-row-highlight');
+        }
+    }
+
+    async function pokerDeal() {
+        if (pokerPhase === 'hold') return;
+
+        const userId = localStorage.getItem('active_session');
+        if (!userId) return alert("Veuillez vous connecter.");
+
+        const betEl = document.getElementById('poker-bet');
+        currentBet  = parseInt(betEl.value);
+        if (isNaN(currentBet) || currentBet < 1) return showNotification("Mise invalide!", "error");
+        if (currentBet > balance)                 return showNotification("Solde insuffisant!", "error");
+
+        document.getElementById('deal-btn').disabled = true;
+        document.getElementById('draw-btn').disabled = false;
+        document.getElementById('phase-hint').classList.remove('hidden');
+        document.getElementById('poker-result').innerHTML = '';
+        highlightPaytable(null);
+        heldCards.clear();
+
+        // Deduct
+        try {
+            await window.fs.updateDoc(window.fs.doc(window.db_online, "users", userId), {
+                balance: window.fs.increment(-currentBet)
+            });
+        } catch(e) {}
+        balance -= currentBet;
+        if (typeof updateBalanceDisplay === "function") updateBalanceDisplay(balance);
+        if (typeof updateGlobalStats    === "function") updateGlobalStats(-currentBet, false, false);
+        if (typeof addToLogs            === "function") addToLogs(`DEAL: -${currentBet} COINS`, "#8b5cf6");
+
+        pokerDeck = buildDeck();
+        pokerHand = [pokerDeck.pop(), pokerDeck.pop(), pokerDeck.pop(), pokerDeck.pop(), pokerDeck.pop()];
+        pokerPhase = 'hold';
+        renderHand(pokerHand, true);
+
+        sessionHands++;
+        document.getElementById('poker-stat-hands').textContent = sessionHands;
+    }
+
+    async function pokerDraw() {
+        if (pokerPhase !== 'hold') return;
+        pokerPhase = 'result';
+        document.getElementById('draw-btn').disabled = true;
+        document.getElementById('phase-hint').classList.add('hidden');
+
+        // Replace non-held cards
+        for (let i = 0; i < 5; i++) {
+            if (!heldCards.has(i)) {
+                pokerHand[i] = pokerDeck.pop();
+            }
+        }
+
+        heldCards.clear();
+        renderHand(pokerHand, false);
+
+        // Evaluate
+        const result = evaluateHand(pokerHand);
+        const userId = localStorage.getItem('active_session');
+
+        setTimeout(async () => {
+            if (result.mult > 0) {
+                const win = currentBet * result.mult;
+                highlightPaytable(result.id);
+                sessionWinsP++;
+                if (result.mult > (RANK_VALUES[bestHandName] || 0)) bestHandName = result.name;
+                document.getElementById('poker-stat-wins').textContent = sessionWinsP;
+                document.getElementById('poker-stat-best').textContent = result.name;
+
+                const color = result.mult >= 25 ? '#fbbf24' : result.mult >= 9 ? '#a78bfa' : '#22c55e';
+                document.getElementById('poker-result').innerHTML = `
+                    <div class="result-slide text-center">
+                        <p class="font-black italic uppercase tracking-tighter text-xl" style="color:${color}">${result.name}</p>
+                        <p class="text-zinc-400 font-bold text-sm mt-1">+${win} coins <span class="text-zinc-600">(×${result.mult})</span></p>
+                    </div>`;
+
+                try {
+                    await window.fs.updateDoc(window.fs.doc(window.db_online, "users", userId), {
+                        balance: window.fs.increment(win)
+                    });
+                } catch(e) {}
+                balance += win;
+                if (typeof updateBalanceDisplay === "function") updateBalanceDisplay(balance);
+                if (typeof updateGlobalStats    === "function") updateGlobalStats(win - currentBet, true, true);
+                if (typeof addToLogs            === "function") addToLogs(`WIN: ${result.name} +${win} COINS`, "#22c55e");
+        if(typeof window.recordGame==="function") window.recordGame("Jacks or Better", currentBet, win-currentBet);
+                if (typeof showNotification     === "function" && result.mult >= 25) showNotification(`🏆 ${result.name}! +${win} coins!`, "success");
+            } else {
+                document.getElementById('poker-result').innerHTML = `
+                    <div class="result-slide text-center">
+                        <p class="font-black italic uppercase tracking-tighter text-lg text-zinc-600">Pas de combinaison</p>
+                        <p class="text-zinc-700 text-xs mt-1">-${currentBet} coins</p>
+                    </div>`;
+                if (typeof updateGlobalStats === "function") updateGlobalStats(-currentBet, false, true);
+                if (typeof addToLogs        === "function") addToLogs(`LOSE: -${currentBet} COINS`, "#ef4444");
+        if(typeof window.recordGame==="function") window.recordGame("Jacks or Better", currentBet, -currentBet);
+            }
+
+            pokerPhase = 'deal';
+            document.getElementById('deal-btn').disabled = false;
+        }, 400);
+    }
+    </script>
+
+    <!-- ========= LOADER SCRIPT ========= -->
+    <script>
+    (function() {
+        var loader  = document.getElementById("koden-loader");
+        var statusEl = document.getElementById("loader-status-text");
+
+        var steps = [
+            { t: 100,  msg: "Connexion Firebase..." },
+            { t: 280,  msg: "Chargement des donnees..." },
+            { t: 500, msg: "Synchronisation session..." },
+            { t: 720, msg: "Pret !" },
+        ];
+
+        steps.forEach(function(s) {
+            setTimeout(function() {
+                if (statusEl) statusEl.textContent = s.msg;
+            }, s.t);
+        });
+
+        function dismiss() {
+            if (!loader) return;
+            loader.classList.add("fade-out");
+            setTimeout(function() {
+                if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+            }, 550);
+        }
+
+        // Dismiss after 1.8s minimum, or when page fully loaded
+        var minTime = 800;
+        var start   = Date.now();
+
+        function tryDismiss() {
+            var elapsed = Date.now() - start;
+            var wait    = Math.max(0, minTime - elapsed);
+            setTimeout(dismiss, wait);
+        }
+
+        if (document.readyState === "complete") {
+            tryDismiss();
+        } else {
+            window.addEventListener("load", tryDismiss);
+            // Hard fallback at 3s
+            setTimeout(dismiss, 1800);
+        }
+    })();
+    </script>
+    <!-- ========= END LOADER SCRIPT ========= -->
+
+</body>
+</html>

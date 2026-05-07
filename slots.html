@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+    <title>KODEN | SLOTS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getFirestore, doc, getDoc, updateDoc, increment, setDoc, deleteDoc, collection,
+            query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, getDocs 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBzucz2akqXT-LQ5ENHqz3U2yaJciJmM04",
+            authDomain: "koden-casino.firebaseapp.com",
+            projectId: "koden-casino",
+            storageBucket: "koden-casino.firebasestorage.app",
+            messagingSenderId: "730117054841",
+            appId: "1:730117054841:web:e34b5b14fd825d9ce2cfa8",
+            measurementId: "G-8BDP8RLVB3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.db_online = db;
+        window.fs = { 
+            doc, getDoc, updateDoc, increment, setDoc, deleteDoc, collection,
+            query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, getDocs 
+        };
+        console.log("Koden_System: Slots Firebase OK.");
+    </script>
+    <style>
+        .reel-track {
+            height: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+        .reel-inner {
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.1s linear;
+        }
+        .reel-symbol {
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            flex-shrink: 0;
+        }
+        @keyframes spinReel {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-100px); }
+        }
+        .spinning .reel-inner {
+            animation: spinReel 0.07s linear infinite;
+        }
+        @keyframes winPop {
+            0%   { transform: scale(1); }
+            40%  { transform: scale(1.15); }
+            70%  { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        .win-pop { animation: winPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes jackpotGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.3); }
+            50%       { box-shadow: 0 0 50px rgba(251,191,36,0.8), 0 0 80px rgba(139,92,246,0.4); }
+        }
+        .jackpot-glow { animation: jackpotGlow 0.8s ease-in-out infinite; }
+
+        @keyframes slidePayout {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .pay-row { animation: slidePayout 0.3s ease forwards; }
+
+        .win-line {
+            position: absolute;
+            top: 50%; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .win-line.active { opacity: 1; }
+    </style>
+    <link rel="stylesheet" href="mobile.css">
+</head>
+<body class="h-screen bg-[#0F0F12] text-white overflow-hidden font-sans flex flex-col p-4 gap-4">
+    <!-- ========= KODEN LOADING SCREEN ========= -->
+    <div id="koden-loader">
+        <div class="loader-scanline"></div>
+
+        <div class="loader-logo">
+            <div class="loader-logo-bar"></div>
+            Koden
+        </div>
+
+        <div class="loader-ring">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle class="loader-ring-track" cx="32" cy="32" r="28" stroke-width="5"/>
+                <circle class="loader-ring-fill"  cx="32" cy="32" r="28" stroke-width="5"
+                    stroke-dasharray="176" stroke-dashoffset="44"
+                    transform="rotate(-90 32 32)"/>
+            </svg>
+        </div>
+
+        <div class="loader-progress-wrap">
+            <div class="loader-bar-bg">
+                <div class="loader-bar-fill" id="loader-bar"></div>
+            </div>
+            <div class="loader-status" id="loader-status-text">Initialisation...</div>
+        </div>
+    </div>
+    <!-- ========= END LOADER ========= -->
+
+
+    <!-- NAV -->
+    <nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl relative">
+        <div class="flex items-center gap-6">
+            <a href="index.html" class="flex items-center gap-2 group">
+                <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
+                <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
+            </a>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
+                <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
+                <span class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
+            </div>
+            <div class="relative">
+                <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all duration-300 group relative">
+                    <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-[#8b5cf6]/50 transition-colors">
+                        <img id="display-pp" src="" class="w-full h-full object-cover hidden" alt="pp">
+                        <span id="display-emoji" class="text-base opacity-50">👤</span>
+                    </div>
+                    <div class="flex flex-col items-start leading-none gap-1">
+                        <div class="flex items-center gap-1.5">
+                            <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">User</span>
+                            <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
+                        </div>
+                        <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-zinc-600 group-hover:text-white transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[100] animate-fadeIn">
+                    <div class="flex flex-col gap-5">
+                        <div class="text-center border-b border-[#1f1f21] pb-4">
+                            <p class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">User_Terminal</p>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all mb-2">Modifier la Photo (URL)</button>
+                            <button onclick="logout()" class="w-full bg-[#1c1c21] border border-zinc-800 text-zinc-300 font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-white/5 transition-all">Se Déconnecter</button>
+                            <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 border border-[#ef4444]/20 text-[#ef4444] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer le compte</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="flex-1 flex gap-4 overflow-hidden">
+
+        <!-- LEFT SIDEBAR -->
+        <aside class="w-80 bg-[#141417] border border-[#1f1f21] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl shrink-0">
+            <div>
+                <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Mise par spin</label>
+                <input id="slots-bet" type="number" value="10" step="1" min="1"
+                    class="w-full bg-[#0F0F12] border border-[#1f1f21] rounded-xl p-4 text-sm font-bold outline-none focus:border-[#fbbf24]/50 transition-all text-white">
+            </div>
+
+            <!-- Quick bet buttons -->
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="setBet(10)"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[10px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">×1</button>
+                <button onclick="setBet(50)"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[10px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">×5</button>
+                <button onclick="setBet(100)" class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[10px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">×10</button>
+                <button onclick="setMaxBet()" class="bg-[#0F0F12] border border-[#fbbf24]/20 text-[#fbbf24] font-black text-[10px] py-2 rounded-xl hover:border-[#fbbf24]/60 transition-all">MAX</button>
+            </div>
+
+            <!-- Paytable -->
+            <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4">
+                <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3">Paytable</p>
+                <div class="space-y-2 text-[11px] font-bold">
+                    <div class="flex justify-between pay-row"><span>💎💎💎</span><span class="text-[#fbbf24]">×50</span></div>
+                    <div class="flex justify-between pay-row"><span>7️⃣7️⃣7️⃣</span><span class="text-[#a78bfa]">×25</span></div>
+                    <div class="flex justify-between pay-row"><span>⭐⭐⭐</span>  <span class="text-[#22c55e]">×15</span></div>
+                    <div class="flex justify-between pay-row"><span>🔔🔔🔔</span><span class="text-[#22c55e]">×10</span></div>
+                    <div class="flex justify-between pay-row"><span>🍋🍋🍋</span><span class="text-zinc-300">×6</span></div>
+                    <div class="flex justify-between pay-row"><span>🍒🍒🍒</span><span class="text-zinc-300">×4</span></div>
+                    <div class="flex justify-between pay-row"><span>🍇🍇🍇</span><span class="text-zinc-300">×3</span></div>
+                    <div class="flex justify-between pay-row border-t border-zinc-800 pt-2"><span class="text-zinc-500">2× same</span><span class="text-zinc-500">×1.5</span></div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4 space-y-2">
+                <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2">Session</p>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Spins</span><span id="stat-spins" class="font-mono font-bold">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Gains</span><span id="stat-wins-slots" class="font-mono font-bold text-[#22c55e]">0</span></div>
+                <div class="flex justify-between text-[11px]"><span class="text-zinc-600 font-bold">Meilleur mult.</span><span id="stat-best-mult" class="font-mono font-bold text-[#fbbf24]">×0</span></div>
+            </div>
+
+            <!-- System Logs -->
+            <div class="flex-1 flex flex-col min-h-0 border-t border-zinc-800 pt-4">
+                <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">System_Logs</label>
+                <div id="logs-container" class="flex-1 bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4 overflow-y-auto space-y-2 font-mono text-[10px] custom-scroll"></div>
+            </div>
+        </aside>
+
+        <!-- GAME AREA -->
+        <section class="flex-1 bg-[#141417] border border-[#1f1f21] rounded-3xl p-8 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden">
+            
+            <!-- BG deco -->
+            <div class="absolute inset-0 pointer-events-none opacity-5">
+                <div class="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-[#8b5cf6] blur-[80px]"></div>
+                <div class="absolute bottom-1/4 right-1/4 w-48 h-48 rounded-full bg-[#fbbf24] blur-[80px]"></div>
+            </div>
+
+            <!-- Title -->
+            <div class="mb-8 text-center z-10">
+                <h1 class="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em] italic mb-1">Machine à sous</h1>
+                <p class="text-2xl font-black italic tracking-tighter uppercase text-white">Koden<span class="text-[#8b5cf6]">_</span>Slots</p>
+            </div>
+
+            <!-- Slot Machine -->
+            <div id="slot-machine" class="bg-[#0F0F12] border-2 border-[#1f1f21] rounded-3xl p-8 relative z-10 transition-all duration-500">
+                
+                <!-- Win line indicator -->
+                <div class="win-line" id="win-line"></div>
+                
+                <!-- Reels -->
+                <div class="flex gap-4 items-center justify-center mb-6">
+                    <div class="reel-track bg-[#141417] border-2 border-[#1f1f21] rounded-2xl w-28" id="reel-0">
+                        <div class="reel-inner" id="reel-inner-0">
+                            <div class="reel-symbol">🍒</div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-zinc-700 font-black text-2xl">|</div>
+                    
+                    <div class="reel-track bg-[#141417] border-2 border-[#1f1f21] rounded-2xl w-28" id="reel-1">
+                        <div class="reel-inner" id="reel-inner-1">
+                            <div class="reel-symbol">🍋</div>
+                        </div>
+                    </div>
+
+                    <div class="text-zinc-700 font-black text-2xl">|</div>
+
+                    <div class="reel-track bg-[#141417] border-2 border-[#1f1f21] rounded-2xl w-28" id="reel-2">
+                        <div class="reel-inner" id="reel-inner-2">
+                            <div class="reel-symbol">⭐</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result message -->
+                <div id="result-msg" class="text-center min-h-[32px] mb-4">
+                    <p class="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Appuyez SPIN pour jouer</p>
+                </div>
+
+                <!-- Spin button -->
+                <button id="spin-btn" onclick="spinSlots()"
+                    class="w-full bg-[#8b5cf6] hover:brightness-110 active:scale-95 text-black font-black py-5 rounded-2xl uppercase italic text-lg tracking-tighter transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] disabled:opacity-40 disabled:cursor-not-allowed">
+                    🎰 SPIN
+                </button>
+            </div>
+
+            <!-- Last wins ticker -->
+            <div class="mt-6 w-full max-w-md z-10">
+                <p class="text-[9px] font-black text-zinc-700 uppercase tracking-widest mb-2 text-center">Derniers résultats</p>
+                <div id="history-ticker" class="flex gap-2 justify-center flex-wrap min-h-[24px]"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="h-10 bg-[#141417] border border-[#1f1f21] rounded-xl shrink-0 flex items-center justify-between px-6 text-[9px] font-mono shadow-lg">
+        <span class="text-[#22c55e] font-bold animate-pulse">● SLOTS_ENGINE_ACTIVE</span>
+        <span class="text-zinc-700">| RNG_CERTIFIED | VER_1.0.0 |</span>
+    </footer>
+
+    <div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <script src="script.js"></script>
+    <script>
+    // ===== SLOTS GAME LOGIC =====
+
+    const SYMBOLS = ['💎','7️⃣','⭐','🔔','🍋','🍒','🍇','🫐'];
+    const WEIGHTS  = [ 1,   2,   4,   6,  10,  14,  16,  20]; // lower = rarer
+    const PAYOUTS  = {
+        '💎💎💎': 50,
+        '7️⃣7️⃣7️⃣': 25,
+        '⭐⭐⭐':  15,
+        '🔔🔔🔔': 10,
+        '🍋🍋🍋':  6,
+        '🍒🍒🍒':  4,
+        '🍇🍇🍇':  3,
+        '🫐🫐🫐':  2,
+    };
+
+    let isSpinning = false;
+    let sessionSpins = 0;
+    let sessionWins  = 0;
+    let bestMult     = 0;
+    const history    = [];
+
+    function weightedRandom() {
+        const total = WEIGHTS.reduce((a, b) => a + b, 0);
+        let r = Math.random() * total;
+        for (let i = 0; i < WEIGHTS.length; i++) {
+            r -= WEIGHTS[i];
+            if (r <= 0) return SYMBOLS[i];
+        }
+        return SYMBOLS[SYMBOLS.length - 1];
+    }
+
+    function setBet(v)    { document.getElementById('slots-bet').value = v; }
+    function setMaxBet()  { document.getElementById('slots-bet').value = Math.min(Math.floor(balance), 500); }
+
+    async function spinSlots() {
+        if (isSpinning) return;
+
+        const userId = localStorage.getItem('active_session');
+        if (!userId) return alert("Veuillez vous connecter.");
+
+        const betInput = document.getElementById('slots-bet');
+        const bet = parseInt(betInput.value);
+        if (isNaN(bet) || bet < 1) return showNotification("Mise invalide !", "error");
+        if (bet > balance)         return showNotification("Solde insuffisant !", "error");
+
+        isSpinning = true;
+        document.getElementById('spin-btn').disabled = true;
+        document.getElementById('win-line').classList.remove('active');
+        document.getElementById('result-msg').innerHTML = `<p class="text-[10px] font-black text-zinc-600 uppercase tracking-widest">En cours...</p>`;
+        document.getElementById('slot-machine').classList.remove('jackpot-glow');
+
+        // Deduct bet
+        try {
+            await window.fs.updateDoc(window.fs.doc(window.db_online, "users", userId), {
+                balance: window.fs.increment(-bet)
+            });
+        } catch(e) { console.error(e); }
+        balance -= bet;
+        if (typeof updateBalanceDisplay === "function") updateBalanceDisplay(balance);
+        if (typeof updateGlobalStats    === "function") updateGlobalStats(-bet, false, false);
+        if (typeof addToLogs            === "function") addToLogs(`SPIN: -${bet} COINS`, "#8b5cf6");
+
+        sessionSpins++;
+        document.getElementById('stat-spins').textContent = sessionSpins;
+
+        // Pick final results
+        const results = [weightedRandom(), weightedRandom(), weightedRandom()];
+
+        // Animate reels
+        const reelDurations = [600, 900, 1200];
+        for (let i = 0; i < 3; i++) {
+            const track = document.getElementById(`reel-${i}`);
+            track.classList.add('spinning');
+            const delay = reelDurations[i];
+            setTimeout(() => {
+                track.classList.remove('spinning');
+                const inner = document.getElementById(`reel-inner-${i}`);
+                inner.innerHTML = `<div class="reel-symbol">${results[i]}</div>`;
+                if (i === 2) evaluateResult(results, bet, userId);
+            }, delay);
+        }
+    }
+
+    async function evaluateResult(results, bet, userId) {
+        const combo = results.join('');
+        let mult = 0;
+        const comboKey = results.join('').replace(/\uFE0F/g, ''); // normalize
+
+        // Check triple
+        if (PAYOUTS[combo]) {
+            mult = PAYOUTS[combo];
+        } else if (results[0] === results[1] || results[1] === results[2] || results[0] === results[2]) {
+            mult = 1.5;
+        }
+
+        const win = mult > 0 ? Math.floor(bet * mult) : 0;
+        const profit = win - bet;
+        const isWin  = win > 0;
+
+        // Update history
+        history.unshift({ symbols: results, mult, win });
+        if (history.length > 8) history.pop();
+        renderHistoryTicker();
+
+        if (isWin) {
+            sessionWins++;
+            if (mult > bestMult) {
+                bestMult = mult;
+                document.getElementById('stat-best-mult').textContent = `×${mult}`;
+            }
+            document.getElementById('stat-wins-slots').textContent = sessionWins;
+
+            // Win line
+            document.getElementById('win-line').classList.add('active');
+
+            // Win animation
+            document.getElementById('slot-machine').classList.add('win-pop');
+            setTimeout(() => document.getElementById('slot-machine').classList.remove('win-pop'), 500);
+
+            // Jackpot glow for big wins
+            if (mult >= 10) {
+                document.getElementById('slot-machine').classList.add('jackpot-glow');
+            }
+
+            const color = mult >= 25 ? "#fbbf24" : "#22c55e";
+            document.getElementById('result-msg').innerHTML = `
+                <p class="font-black italic uppercase tracking-tighter" style="color:${color}; font-size: 1.1rem;">
+                    ${mult >= 25 ? '🏆 JACKPOT!' : '✅ WIN!'} +${win} coins (×${mult})
+                </p>`;
+
+            // Firebase update
+            try {
+                await window.fs.updateDoc(window.fs.doc(window.db_online, "users", userId), {
+                    balance: window.fs.increment(win)
+                });
+            } catch(e) {}
+            balance += win;
+            if (typeof updateBalanceDisplay === "function") updateBalanceDisplay(balance);
+            if (typeof updateGlobalStats    === "function") updateGlobalStats(profit, true, true);
+            if (typeof addToLogs            === "function") addToLogs(`WIN: +${win} COINS (×${mult})`, "#22c55e");
+            if (typeof showNotification     === "function" && mult >= 15) showNotification(`🏆 GROS GAIN! ×${mult} — +${win} coins!`, "success");
+        } else {
+            document.getElementById('result-msg').innerHTML = `<p class="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Pas de chance. Réessayez !</p>`;
+            if (typeof updateGlobalStats    === "function") updateGlobalStats(-bet, false, true);
+            if (typeof addToLogs            === "function") addToLogs(`LOSE: -${bet} COINS`, "#ef4444");
+        }
+
+        isSpinning = false;
+        document.getElementById('spin-btn').disabled = false;
+
+        if (balance <= 0 && typeof showNotification === "function") {
+            showNotification("Solde épuisé !", "error");
+        }
+    }
+
+    function renderHistoryTicker() {
+        const container = document.getElementById('history-ticker');
+        container.innerHTML = '';
+        history.forEach(h => {
+            const el = document.createElement('div');
+            const color = h.mult >= 10 ? 'border-[#fbbf24]/50 text-[#fbbf24]' : h.mult > 0 ? 'border-[#22c55e]/30 text-[#22c55e]' : 'border-[#1f1f21] text-zinc-600';
+            el.className = `flex gap-1 items-center bg-[#0F0F12] border ${color} rounded-xl px-2 py-1 text-[9px] font-bold`;
+            el.innerHTML = `<span>${h.symbols.join('')}</span><span class="text-[8px]">${h.mult > 0 ? `×${h.mult}` : ''}</span>`;
+            container.appendChild(el);
+        });
+    }
+    </script>
+
+    <!-- ========= LOADER SCRIPT ========= -->
+    <script>
+    (function() {
+        var loader  = document.getElementById("koden-loader");
+        var statusEl = document.getElementById("loader-status-text");
+
+        var steps = [
+            { t: 100,  msg: "Connexion Firebase..." },
+            { t: 280,  msg: "Chargement des donnees..." },
+            { t: 500, msg: "Synchronisation session..." },
+            { t: 720, msg: "Pret !" },
+        ];
+
+        steps.forEach(function(s) {
+            setTimeout(function() {
+                if (statusEl) statusEl.textContent = s.msg;
+            }, s.t);
+        });
+
+        function dismiss() {
+            if (!loader) return;
+            loader.classList.add("fade-out");
+            setTimeout(function() {
+                if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+            }, 550);
+        }
+
+        // Dismiss after 1.8s minimum, or when page fully loaded
+        var minTime = 800;
+        var start   = Date.now();
+
+        function tryDismiss() {
+            var elapsed = Date.now() - start;
+            var wait    = Math.max(0, minTime - elapsed);
+            setTimeout(dismiss, wait);
+        }
+
+        if (document.readyState === "complete") {
+            tryDismiss();
+        } else {
+            window.addEventListener("load", tryDismiss);
+            // Hard fallback at 3s
+            setTimeout(dismiss, 1800);
+        }
+    })();
+    </script>
+    <!-- ========= END LOADER SCRIPT ========= -->
+
+</body>
+</html>

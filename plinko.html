@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KODEN | PLINKO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore,doc,getDoc,updateDoc,increment,setDoc,deleteDoc,collection,query,orderBy,limit,onSnapshot,addDoc,serverTimestamp,getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  const cfg={apiKey:"AIzaSyBzucz2akqXT-LQ5ENHqz3U2yaJciJmM04",authDomain:"koden-casino.firebaseapp.com",projectId:"koden-casino",storageBucket:"koden-casino.firebasestorage.app",messagingSenderId:"730117054841",appId:"1:730117054841:web:e34b5b14fd825d9ce2cfa8"};
+  const app=initializeApp(cfg);
+  window.db_online=getFirestore(app);window.auth=getAuth(app);
+  window.fs={doc,getDoc,updateDoc,increment,setDoc,deleteDoc,collection,query,orderBy,limit,onSnapshot,addDoc,serverTimestamp,getDocs};
+  onAuthStateChanged(window.auth,u=>{if(u&&typeof refreshUserData==="function")refreshUserData();});
+</script>
+<style>
+canvas#plinko{display:block;border-radius:16px;background:#0a0a0f;}
+@keyframes ballDrop{0%{transform:translateY(-10px);opacity:0;}100%{transform:none;opacity:1;}}
+</style>
+</head>
+<body class="h-screen bg-[#0F0F12] text-white overflow-hidden font-sans flex flex-col p-4 gap-4">
+
+<!-- NAV -->
+<nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl">
+  <div class="flex items-center gap-6">
+    <a href="index.html" class="flex items-center gap-2 group">
+      <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
+      <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
+    </a>
+  </div>
+  <div class="flex items-center gap-4">
+    <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
+      <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
+      <span class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
+    </div>
+    <div class="relative">
+      <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all group">
+        <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+          <img id="display-pp" src="" class="w-full h-full object-cover hidden">
+          <span id="display-emoji" class="text-base opacity-50">&#x1F464;</span>
+        </div>
+        <div class="flex flex-col items-start leading-none gap-1">
+          <div class="flex items-center gap-1.5">
+            <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">User</span>
+            <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
+          </div>
+          <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+        </div>
+      </button>
+      <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-2xl z-[100]">
+        <div class="space-y-2">
+          <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all">Modifier la photo</button>
+          <button onclick="logout()" class="w-full bg-[#1c1c21] border border-zinc-800 text-zinc-300 font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-white/5 transition-all">Se Deconnecter</button>
+          <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 border border-[#ef4444]/20 text-[#ef4444] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer le compte</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="flex-1 flex gap-4 overflow-hidden min-h-0">
+
+  <!-- SIDEBAR -->
+  <aside class="w-72 bg-[#141417] border border-[#1f1f21] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl overflow-y-auto custom-scroll shrink-0">
+    <div>
+      <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Mise par balle</label>
+      <input id="plinko-bet" type="number" value="10" min="1" step="1" class="w-full bg-[#0F0F12] border border-[#1f1f21] rounded-xl p-4 text-sm font-bold outline-none focus:border-[#fbbf24]/50 transition-all text-white mb-3">
+      <div class="grid grid-cols-4 gap-2">
+        <button onclick="document.getElementById('plinko-bet').value=5"   class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">5</button>
+        <button onclick="document.getElementById('plinko-bet').value=25"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">25</button>
+        <button onclick="document.getElementById('plinko-bet').value=50"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">50</button>
+        <button onclick="document.getElementById('plinko-bet').value=100" class="bg-[#0F0F12] border border-[#fbbf24]/20 text-[#fbbf24] font-black text-[9px] py-2 rounded-xl hover:border-[#fbbf24] transition-all">100</button>
+      </div>
+    </div>
+
+    <!-- Risque -->
+    <div>
+      <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Niveau de risque</label>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="risk-low"  onclick="setRisk('low')"  class="risk-btn bg-[#22c55e]/10 border border-[#22c55e]/30 text-[#22c55e] font-black text-[9px] py-2 rounded-xl transition-all">Bas</button>
+        <button id="risk-mid"  onclick="setRisk('mid')"  class="risk-btn bg-[#fbbf24]/10 border border-[#fbbf24]/30 text-[#fbbf24] font-black text-[9px] py-2 rounded-xl transition-all selected-risk">Moyen</button>
+        <button id="risk-high" onclick="setRisk('high')" class="risk-btn bg-[#ef4444]/10 border border-[#ef4444]/30 text-[#ef4444] font-black text-[9px] py-2 rounded-xl transition-all">Haut</button>
+      </div>
+    </div>
+
+    <!-- Multiplicateurs -->
+    <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4">
+      <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3">Cases (mult.)</p>
+      <div id="mult-display" class="flex flex-wrap gap-1.5 justify-center text-[9px] font-black"></div>
+    </div>
+
+    <!-- Stats session -->
+    <div class="bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4">
+      <p class="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3">Session</p>
+      <div class="space-y-2 text-[11px]">
+        <div class="flex justify-between"><span class="text-zinc-600 font-bold">Balles</span><span id="pk-balls" class="font-mono font-bold">0</span></div>
+        <div class="flex justify-between"><span class="text-zinc-600 font-bold">Gains</span><span id="pk-wins" class="font-mono font-bold text-[#22c55e]">0</span></div>
+        <div class="flex justify-between"><span class="text-zinc-600 font-bold">Meilleur mult.</span><span id="pk-best" class="font-mono font-bold text-[#fbbf24]">x0</span></div>
+      </div>
+    </div>
+
+    <!-- Bouton -->
+    <button id="drop-btn" onclick="dropBall()" class="w-full bg-[#8b5cf6] hover:brightness-110 active:scale-95 text-black font-black py-5 rounded-2xl uppercase italic tracking-tighter transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+      Lancer la balle
+    </button>
+
+    <!-- Logs -->
+    <div class="flex-1 flex flex-col min-h-0 border-t border-zinc-800 pt-4">
+      <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">System_Logs</label>
+      <div id="logs-container" class="flex-1 bg-[#0F0F12] border border-[#1f1f21] rounded-2xl p-4 overflow-y-auto space-y-2 font-mono text-[10px] custom-scroll min-h-[80px]"></div>
+    </div>
+  </aside>
+
+  <!-- GAME CANVAS -->
+  <section class="flex-1 bg-[#141417] border border-[#1f1f21] rounded-3xl flex items-center justify-center relative overflow-hidden shadow-2xl">
+    <canvas id="plinko" width="520" height="560"></canvas>
+    <!-- Result flash -->
+    <div id="plinko-result" class="absolute bottom-8 left-1/2 -translate-x-1/2 text-2xl font-black italic uppercase tracking-tighter pointer-events-none opacity-0 transition-all duration-300"></div>
+  </section>
+</main>
+
+<footer class="h-10 bg-[#141417] border border-[#1f1f21] rounded-xl shrink-0 flex items-center justify-between px-6 text-[9px] font-mono shadow-lg">
+  <span class="text-[#22c55e] font-bold animate-pulse">&#x25CF; PLINKO_ENGINE_ACTIVE</span>
+  <span class="text-zinc-700">| GALTON_BOARD | VER_1.0.0 |</span>
+</footer>
+
+<div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+<script src="script.js"></script>
+<script>
+// ===== PLINKO ENGINE =====
+const canvas = document.getElementById('plinko');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// Multipliers per risk level
+const MULTS = {
+  low:  [5.6, 2.1, 1.1, 1.0, 0.5, 1.0, 1.1, 2.1, 5.6],
+  mid:  [13,  3,   1.3, 0.7, 0.4, 0.7, 1.3, 3,   13],
+  high: [29,  4,   1.5, 0.3, 0.2, 0.3, 1.5, 4,   29],
+};
+const MULT_COLORS = {
+  low:  ['#fbbf24','#a78bfa','#22c55e','#60a5fa','#6b7280','#60a5fa','#22c55e','#a78bfa','#fbbf24'],
+  mid:  ['#fbbf24','#f97316','#22c55e','#60a5fa','#6b7280','#60a5fa','#22c55e','#f97316','#fbbf24'],
+  high: ['#ef4444','#f97316','#22c55e','#6b7280','#374151','#6b7280','#22c55e','#f97316','#ef4444'],
+};
+
+const ROWS = 12;
+const COLS = ROWS + 1; // 13 pegs per bottom row
+const PAD_X = 60, PAD_Y = 48;
+const STEP_X = (W - PAD_X*2) / (COLS - 1);
+const STEP_Y = (H - PAD_Y*2 - 80) / (ROWS);
+
+let currentRisk = 'mid';
+let balls = [];
+let pkBalls=0, pkWins=0, pkBest=0;
+
+function setRisk(r) {
+  currentRisk = r;
+  document.querySelectorAll('.risk-btn').forEach(b => b.style.opacity='0.5');
+  document.getElementById('risk-'+r).style.opacity='1';
+  renderMultDisplay();
+}
+
+function renderMultDisplay() {
+  const el = document.getElementById('mult-display');
+  const mults = MULTS[currentRisk];
+  const colors = MULT_COLORS[currentRisk];
+  el.innerHTML = mults.map((m,i) => 
+    `<span style="background:${colors[i]}22;color:${colors[i]};border:1px solid ${colors[i]}44;padding:2px 7px;border-radius:6px;">x${m}</span>`
+  ).join('');
+}
+renderMultDisplay();
+
+// Peg positions
+function pegPos(row, col) {
+  const offset = row % 2 === 0 ? 0 : STEP_X / 2;
+  const totalPegs = row % 2 === 0 ? COLS : COLS - 1;
+  const startX = PAD_X + offset;
+  return {
+    x: startX + col * STEP_X,
+    y: PAD_Y + row * STEP_Y
+  };
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Pegs
+  for (let row = 0; row < ROWS; row++) {
+    const pegsInRow = row % 2 === 0 ? COLS : COLS - 1;
+    for (let col = 0; col < pegsInRow; col++) {
+      const {x, y} = pegPos(row, col);
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(139,92,246,0.6)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(167,139,250,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Bucket slots
+  const bucketY = PAD_Y + ROWS * STEP_Y + 12;
+  const mults = MULTS[currentRisk];
+  const colors = MULT_COLORS[currentRisk];
+  const bucketW = STEP_X - 4;
+  mults.forEach((m, i) => {
+    const bx = PAD_X + i * STEP_X - bucketW/2;
+    ctx.fillStyle = colors[i] + '22';
+    ctx.strokeStyle = colors[i] + '88';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(bx, bucketY, bucketW, 36, 6);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = colors[i];
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('x' + m, PAD_X + i * STEP_X, bucketY + 22);
+  });
+
+  // Balls
+  balls.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 8, 0, Math.PI*2);
+    const grad = ctx.createRadialGradient(b.x-2, b.y-2, 1, b.x, b.y, 8);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(1, b.color || '#a78bfa');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+}
+
+function spawnBall(bet, userId) {
+  // Start near the top center with small random offset
+  const startX = W/2 + (Math.random()-0.5)*STEP_X*0.5;
+  const b = {
+    x: startX, y: PAD_Y - 20,
+    vx: (Math.random()-0.5)*0.5,
+    vy: 0,
+    bet, userId,
+    color: '#a78bfa',
+    done: false,
+    currentRow: -1,
+  };
+  balls.push(b);
+}
+
+function updateBalls() {
+  const bucketY = PAD_Y + ROWS * STEP_Y + 12;
+  const gravity = 0.22;
+  const BALL_R  = 8;
+  const PEG_R   = 5;
+
+  balls.forEach(b => {
+    if (b.done) return;
+    b.vy += gravity;
+    b.x  += b.vx;
+    b.y  += b.vy;
+
+    // Peg collisions
+    for (let row = 0; row < ROWS; row++) {
+      const pegsInRow = row % 2 === 0 ? COLS : COLS - 1;
+      for (let col = 0; col < pegsInRow; col++) {
+        const p = pegPos(row, col);
+        const dx = b.x - p.x, dy = b.y - p.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < BALL_R + PEG_R + 1) {
+          // Bounce: reflect velocity + random nudge
+          const nx = dx/dist, ny = dy/dist;
+          const speed = Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+          b.vx = nx * speed * 0.6 + (Math.random()-0.5)*1.2;
+          b.vy = Math.abs(ny * speed * 0.6) + 1;
+          // Separate
+          b.x = p.x + nx*(BALL_R+PEG_R+1);
+          b.y = p.y + ny*(BALL_R+PEG_R+1);
+        }
+      }
+    }
+
+    // Wall bounces
+    if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx); }
+    if (b.x > W-BALL_R) { b.x = W-BALL_R; b.vx = -Math.abs(b.vx); }
+
+    // Landed in bucket
+    if (b.y >= bucketY + 10) {
+      b.done = true;
+      // Which slot?
+      const mults = MULTS[currentRisk];
+      const slotIdx = Math.max(0, Math.min(mults.length-1,
+        Math.floor((b.x - PAD_X + STEP_X/2) / STEP_X)
+      ));
+      const mult = mults[slotIdx];
+      const win  = Math.floor(b.bet * mult);
+      finalizeBall(b, mult, win, slotIdx);
+    }
+  });
+
+  balls = balls.filter(b => !b.done || b._keepFrames-- > 0);
+}
+
+async function finalizeBall(b, mult, win, slotIdx) {
+  pkBalls++;
+  document.getElementById('pk-balls').textContent = pkBalls;
+
+  const profit = win - b.bet;
+  const isWin  = mult >= 1;
+
+  if (win > 0) {
+    try {
+      await window.fs.updateDoc(window.fs.doc(window.db_online,"users",b.userId),{balance:window.fs.increment(win)});
+    } catch(e){}
+    balance += win;
+    if(typeof updateBalanceDisplay==="function") updateBalanceDisplay(balance);
+  }
+  if(typeof updateGlobalStats==="function") updateGlobalStats(profit, isWin, true);
+  if(typeof addToLogs==="function") {
+    const c = profit>=0?"#22c55e":"#ef4444";
+    addToLogs(`BALLE: x${mult} → ${profit>=0?'+':''}${profit} coins`, c);
+  }
+
+  if (mult >= 5) {
+    pkWins++;
+    if (mult > pkBest) { pkBest=mult; document.getElementById('pk-best').textContent='x'+mult; }
+    document.getElementById('pk-wins').textContent = pkWins;
+    if(typeof showNotification==="function") showNotification(`x${mult} ! +${win} coins !`,"success");
+  }
+
+  // Flash result
+  const res = document.getElementById('plinko-result');
+  res.textContent = profit>=0 ? `+${win} coins (x${mult})` : `-${b.bet} coins`;
+  res.style.color  = profit>=0 ? '#22c55e' : '#ef4444';
+  res.style.opacity='1';
+  setTimeout(()=>res.style.opacity='0', 1500);
+
+  if(balance<=0 && typeof showNotification==="function") showNotification("Solde epuise !","error");
+}
+
+async function dropBall() {
+  const userId = localStorage.getItem('active_session');
+  if (!userId) return;
+  const bet = parseInt(document.getElementById('plinko-bet').value);
+  if (isNaN(bet)||bet<1) return;
+  if (bet > balance) { if(typeof showNotification==="function") showNotification("Solde insuffisant !","error"); return; }
+
+  // Deduct
+  try {
+    await window.fs.updateDoc(window.fs.doc(window.db_online,"users",userId),{balance:window.fs.increment(-bet)});
+  } catch(e){}
+  balance -= bet;
+  if(typeof updateBalanceDisplay==="function") updateBalanceDisplay(balance);
+  if(typeof updateGlobalStats==="function") updateGlobalStats(-bet,false,false);
+
+  spawnBall(bet, userId);
+}
+
+// Game loop
+function loop() {
+  updateBalls();
+  drawBoard();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+<!-- Loader -->
+<div id="koden-loader" style="position:fixed;inset:0;z-index:99999;background:#0F0F12;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;transition:opacity 0.5s ease;">
+  <div style="font-size:2rem;font-weight:900;font-style:italic;text-transform:uppercase;color:white;display:flex;align-items:center;gap:6px;">
+    <div style="width:6px;height:32px;background:#8b5cf6;border-radius:3px;"></div>Koden
+  </div>
+  <div style="width:180px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+    <div style="height:100%;background:#8b5cf6;border-radius:2px;animation:loaderFill 1.6s cubic-bezier(0.4,0,0.2,1) forwards;"></div>
+  </div>
+</div>
+<style>@keyframes loaderFill{0%{width:0%}100%{width:100%}}</style>
+<script>(function(){var l=document.getElementById("koden-loader");function d(){l.style.opacity="0";setTimeout(()=>l&&l.remove(),550);}window.addEventListener("load",function(){setTimeout(d,1800);});setTimeout(d,3000);})();</script>
+</body>
+</html>

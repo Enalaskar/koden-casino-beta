@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Koden — Poker En Ligne</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        :root {
+            --green: #22c55e; --purple: #8b5cf6; --gold: #fbbf24;
+            --bg: #0F0F12; --card: #141417; --border: #1f1f21;
+        }
+        body { background: var(--bg); color: white; }
+
+        .table-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+            transition: all 0.25s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; cursor: pointer;
+        }
+        .table-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--purple), transparent); opacity: 0; transition: opacity 0.3s;
+        }
+        .table-card:hover { border-color: rgba(139,92,246,0.5); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(139,92,246,0.15); }
+        .table-card:hover::before { opacity: 1; }
+        .table-card.full { opacity: 0.45; cursor: not-allowed; }
+        .table-card.full:hover { transform: none; border-color: var(--border); box-shadow: none; }
+
+        .seat-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.08); }
+        .seat-dot.on { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+        .seat-dot.off { background: #1f1f21; }
+
+        .stakes-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; font-size: 8px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+        .s-low  { background: rgba(34,197,94,0.1);  color: var(--green);  border: 1px solid rgba(34,197,94,0.2); }
+        .s-mid  { background: rgba(251,191,36,0.1); color: var(--gold);   border: 1px solid rgba(251,191,36,0.2); }
+        .s-high { background: rgba(239,68,68,0.1);  color: #ef4444;       border: 1px solid rgba(239,68,68,0.2); }
+        .s-vip  { background: rgba(139,92,246,0.12);color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
+
+        .pulse-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .pulse-dot.g { background: var(--green); animation: pg 2s infinite; }
+        .pulse-dot.y { background: var(--gold);  animation: py 2s infinite; }
+        .pulse-dot.r { background: #ef4444; }
+        @keyframes pg { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)} 50%{box-shadow:0 0 0 5px rgba(34,197,94,0)} }
+        @keyframes py { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.4)} 50%{box-shadow:0 0 0 5px rgba(251,191,36,0)} }
+
+        .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.85); backdrop-filter:blur(8px); z-index:200; display:flex; align-items:center; justify-content:center; padding:16px; }
+        .modal-box { background:var(--card); border:1px solid var(--border); border-radius:28px; width:100%; max-width:460px; overflow:hidden; animation:mIn .3s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes mIn { from{transform:scale(.85) translateY(20px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+
+        .form-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 16px; color:white; font-size:13px; font-family:'Space Grotesk',sans-serif; outline:none; transition:border-color .2s; }
+        .form-input:focus { border-color: rgba(139,92,246,.5); }
+
+        .btn-join { position:relative; overflow:hidden; background:var(--green); color:black; font-weight:800; font-size:9px; letter-spacing:.1em; text-transform:uppercase; padding:7px 14px; border-radius:9px; border:none; cursor:pointer; transition:all .2s; }
+        .btn-join:hover { background:#16a34a; }
+        .btn-create { position:relative; overflow:hidden; background:var(--purple); color:white; font-weight:800; font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:11px 22px; border-radius:13px; border:none; cursor:pointer; transition:all .2s; box-shadow:0 0 20px rgba(139,92,246,.3); }
+        .btn-create:hover { background:#7c3aed; box-shadow:0 0 30px rgba(139,92,246,.5); }
+
+        .tab-btn { padding:7px 14px; border-radius:9px; font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#52525b; border:none; background:transparent; cursor:pointer; transition:all .2s; }
+        .tab-btn.active { background:rgba(34,197,94,.1); color:var(--green); }
+        .tab-btn:hover:not(.active) { color:#a1a1aa; }
+
+        .blinds-pill { font-size:10px; font-weight:700; color:var(--gold); background:rgba(251,191,36,.07); border:1px solid rgba(251,191,36,.15); border-radius:8px; padding:2px 8px; }
+
+        .mini-avatar { 
+    width: 28px;  /* Augmenté de 20px */
+    height: 28px; /* Augmenté de 20px */
+    border-radius: 50%; 
+    background: #27272a; 
+    border: 2px solid var(--card); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-size: 14px; /* Augmenté pour l'emoji */
+    margin-left: -10px; /* Chevauchement ajusté */
+    overflow: hidden; /* Pour que l'image ne dépasse pas si c'est une photo */
+}
+        .mini-avatar:first-child { margin-left:0; }
+
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .fade-up { animation: fadeUp .35s ease-out forwards; }
+
+        #koden-loader { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:18px; }
+        .ring { width:44px; height:44px; border:3px solid rgba(34,197,94,.2); border-top-color:var(--green); border-radius:50%; animation:spin .7s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+
+        .hand-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:10px; }
+        .hand-row:last-child { border-bottom:none; }
+
+        .custom-scroll::-webkit-scrollbar { width:4px; }
+        .custom-scroll::-webkit-scrollbar-track { background:transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background:#2a2a2c; border-radius:10px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background:var(--purple); }
+
+        .player-select-btn { padding:8px 0; border-radius:10px; font-size:12px; font-weight:800; border:1px solid var(--border); background:transparent; color:#52525b; cursor:pointer; transition:all .2s; width:38px; text-align:center; }
+        .player-select-btn.sel { background:rgba(34,197,94,.1); border-color:rgba(34,197,94,.4); color:var(--green); }
+
+        .vis-btn { flex:1; padding:11px; border-radius:11px; font-weight:800; text-transform:uppercase; font-size:10px; border:1px solid var(--border); background:transparent; color:#52525b; cursor:pointer; transition:all .2s; }
+        .vis-btn.sel-pub { background:rgba(34,197,94,.1); border-color:rgba(34,197,94,.3); color:var(--green); }
+        .vis-btn.sel-priv { background:rgba(139,92,246,.1); border-color:rgba(139,92,246,.3); color:var(--purple); }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden p-4 gap-4">
+
+<!-- ========= LOADER ========= -->
+<div id="koden-loader">
+    <div style="font-size:36px">🃏</div>
+    <div class="ring"></div>
+    <p style="font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--green);">Connexion aux tables...</p>
+</div>
+
+<!-- ========= MODAL : CRÉER TABLE ========= -->
+<div id="create-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div style="padding:24px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(34,197,94,.07),transparent)" class="flex items-center justify-between">
+            <div>
+                <h2 style="font-size:17px;font-weight:800;text-transform:uppercase;letter-spacing:-.01em;">Créer une Table</h2>
+                <p style="font-size:8px;color:#52525b;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-top:2px;">Texas Hold'em — No Limit</p>
+            </div>
+            <button onclick="closeCreate()" style="color:#52525b;font-size:18px;background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;max-height:70vh;overflow-y:auto;" class="custom-scroll">
+
+            <!-- Nom -->
+            <div>
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">Nom de la table</label>
+                <input id="c-name" class="form-input" placeholder="ex: High Rollers Only…" maxlength="30">
+            </div>
+
+            <!-- Blinds -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">🔸 Petite blind</label>
+                    <input id="c-sb" class="form-input" type="number" min="1" value="5">
+                </div>
+                <div>
+                    <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">🔶 Grande blind</label>
+                    <input id="c-bb" class="form-input" type="number" min="2" value="10">
+                </div>
+            </div>
+
+            <!-- Buy-in min -->
+            <div>
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">💰 Buy-in minimum</label>
+                <input id="c-buyin" class="form-input" type="number" min="10" value="100">
+                <p style="font-size:8px;color:#3f3f46;margin-top:4px;">Ton solde : <span id="c-bal" style="color:var(--gold);font-weight:800;">0</span> coins</p>
+            </div>
+
+            <!-- Max players -->
+            <div>
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:8px;">Joueurs max (2–9)</label>
+                <div id="c-players" class="flex gap-2 flex-wrap"></div>
+            </div>
+
+            <!-- Visibilité -->
+            <div>
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:8px;">Visibilité</label>
+                <div class="flex gap-3">
+                    <button id="v-pub" class="vis-btn sel-pub" onclick="setVis('public')">🌍 Publique</button>
+                    <button id="v-priv" class="vis-btn" onclick="setVis('private')">🔒 Privée</button>
+                </div>
+            </div>
+
+            <!-- Password -->
+            <div id="pw-field" class="hidden">
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">Mot de passe</label>
+                <input id="c-pw" class="form-input" type="password" placeholder="Code d'accès…">
+            </div>
+
+            <div id="c-err" class="hidden" style="color:#ef4444;font-size:10px;font-weight:700;text-align:center;padding:8px;background:rgba(239,68,68,.08);border-radius:8px;border:1px solid rgba(239,68,68,.2);"></div>
+
+            <button onclick="createTable()" class="btn-create" style="width:100%;padding:14px;">♠ Créer la Table</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========= MODAL : REJOINDRE ========= -->
+<div id="join-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div style="padding:24px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(34,197,94,.06),transparent);" class="flex items-center justify-between">
+            <div>
+                <h2 style="font-size:17px;font-weight:800;text-transform:uppercase;">Rejoindre</h2>
+                <p id="j-name" style="font-size:12px;color:var(--purple);font-weight:700;margin-top:3px;"></p>
+            </div>
+            <button onclick="closeJoin()" style="color:#52525b;font-size:18px;background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+            <div id="j-stats" class="grid grid-cols-3 gap-3"></div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;">
+                <div class="flex items-center justify-between" style="margin-bottom:8px;">
+                    <span style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#52525b;">Montant Buy-in</span>
+                    <span style="font-size:8px;color:var(--gold);font-weight:700;">Solde : <span id="j-bal">0</span></span>
+                </div>
+                <input id="j-amount" class="form-input" type="number" placeholder="Mise d'entrée…">
+                <p id="j-info" style="font-size:8px;color:#3f3f46;margin-top:4px;"></p>
+            </div>
+            <div id="j-pw-wrap" class="hidden">
+                <label style="font-size:8px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#52525b;display:block;margin-bottom:6px;">🔒 Mot de passe</label>
+                <input id="j-pw" class="form-input" type="password" placeholder="Entrer le code…">
+            </div>
+            <div id="j-err" class="hidden" style="color:#ef4444;font-size:10px;font-weight:700;text-align:center;padding:8px;background:rgba(239,68,68,.08);border-radius:8px;border:1px solid rgba(239,68,68,.2);"></div>
+            <button onclick="confirmJoin()" class="btn-join" style="width:100%;padding:14px;font-size:11px;border-radius:14px;">♠ S'asseoir à la table</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========= NAVBAR ========= -->
+<nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl relative">
+    <div class="flex items-center gap-6">
+        <a href="index.html" class="flex items-center gap-2 group">
+            <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
+            <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
+        </a>
+    </div>
+    <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
+            <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
+            <span id="nav-balance" class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
+        </div>
+        <div class="relative">
+            <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all group">
+                <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                    <img id="display-pp" src="" class="w-full h-full object-cover hidden" alt="pp">
+                    <span id="display-emoji" class="text-base opacity-50">👤</span>
+                </div>
+                <div class="flex flex-col items-start leading-none gap-1">
+                    <div class="flex items-center gap-1.5">
+                        <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">—</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
+                    </div>
+                    <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+                </div>
+                <svg class="w-3 h-3 text-zinc-600 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-2xl z-[100]">
+                <div class="flex flex-col gap-5 text-center">
+                    <p class="text-[10px] font-black text-zinc-500 uppercase pb-4 border-b border-[#1f1f21]">User_Terminal</p>
+                    <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 text-[#8b5cf6] font-black py-3 rounded-xl uppercase text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all">Modifier Photo</button>
+                    <button onclick="logout()" class="w-full bg-[#1c1c21] text-zinc-300 font-black py-3 rounded-xl uppercase text-[10px] hover:bg-white/5 transition-all">Se Déconnecter</button>
+                    <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 text-[#ef4444] font-black py-3 rounded-xl uppercase text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer compte</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- ========= MAIN ========= -->
+<div class="flex-1 flex gap-4 overflow-hidden">
+
+    <!-- LEFT : Tables -->
+    <div class="flex-1 flex flex-col gap-4 overflow-hidden">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between shrink-0">
+            <div>
+                <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;text-transform:uppercase;line-height:1;">♠ Salons de Poker</h1>
+                <p style="font-size:8px;color:#52525b;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-top:2px;">Texas Hold'em · Temps réel · 2–9 joueurs</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:4px;display:flex;gap:2px;">
+                    <button class="tab-btn active" id="tab-all"     onclick="filter('all')">Tous</button>
+                    <button class="tab-btn"        id="tab-waiting" onclick="filter('waiting')">Dispo</button>
+                    <button class="tab-btn"        id="tab-playing" onclick="filter('playing')">En cours</button>
+                </div>
+                <button onclick="openCreate()" class="btn-create flex items-center gap-2">＋ Créer une table</button>
+            </div>
+        </div>
+
+        <!-- Grid -->
+        <div id="tables-grid" class="flex-1 overflow-y-auto custom-scroll pr-1">
+            <div id="empty-loader" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">
+                <div class="ring"></div>
+                <p style="font-size:9px;color:#3f3f46;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Chargement des tables…</p>
+            </div>
+            <div id="tables-list" class="grid grid-cols-1 gap-3" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="w-72 flex flex-col gap-4 shrink-0 overflow-y-auto custom-scroll">
+
+        <!-- Stats live -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;">
+            <div style="padding:14px 18px;background:#1a1a1e;border-bottom:1px solid rgba(255,255,255,.04);">
+                <h3 style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">📊 Stats Live</h3>
+            </div>
+            <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+                <div class="flex justify-between items-center">
+                    <span style="font-size:8px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">Tables actives</span>
+                    <span id="s-tables" style="font-size:18px;font-weight:800;color:var(--green);">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span style="font-size:8px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">Joueurs assis</span>
+                    <span id="s-players" style="font-size:18px;font-weight:800;color:var(--purple);">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span style="font-size:8px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">Parties en cours</span>
+                    <span id="s-games" style="font-size:18px;font-weight:800;color:var(--gold);">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mains gagnantes -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;">
+            <div style="padding:14px 18px;background:#1a1a1e;border-bottom:1px solid rgba(255,255,255,.04);">
+                <h3 style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">🃏 Mains Gagnantes</h3>
+            </div>
+            <div style="padding:10px 16px;">
+                <div class="hand-row"><span style="color:var(--gold);font-weight:700;">👑 Quinte Flush Royale</span><span style="color:#52525b;font-size:8px;">x800</span></div>
+                <div class="hand-row"><span style="font-weight:600;">🔥 Quinte Flush</span><span style="color:#52525b;font-size:8px;">x50</span></div>
+                <div class="hand-row"><span style="font-weight:600;">4️⃣ Carré</span><span style="color:#52525b;font-size:8px;">x25</span></div>
+                <div class="hand-row"><span style="font-weight:600;">🏠 Full House</span><span style="color:#52525b;font-size:8px;">x9</span></div>
+                <div class="hand-row"><span style="font-weight:600;">♦ Couleur</span><span style="color:#52525b;font-size:8px;">x6</span></div>
+                <div class="hand-row"><span style="font-weight:600;">📈 Suite</span><span style="color:#52525b;font-size:8px;">x4</span></div>
+                <div class="hand-row"><span style="font-weight:600;">3️⃣ Brelan</span><span style="color:#52525b;font-size:8px;">x3</span></div>
+                <div class="hand-row"><span style="font-weight:600;">2️⃣ Double Paire</span><span style="color:#52525b;font-size:8px;">x2</span></div>
+                <div class="hand-row"><span style="color:#52525b;font-weight:600;">Paire / Haute carte</span><span style="color:#52525b;font-size:8px;">—</span></div>
+            </div>
+        </div>
+
+        <!-- Tips -->
+        <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:16px;padding:16px;font-size:9px;color:#52525b;font-weight:600;line-height:2;">
+            <p style="color:var(--green);font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">💡 Conseils</p>
+            <p>• La partie commence dès que <strong style="color:white;">2 joueurs</strong> sont assis.</p>
+            <p>• Ton buy-in est déduit de ton solde à l'entrée.</p>
+            <p>• En quittant la table, ton solde restant est remboursé.</p>
+            <p>• Les tables vides sont supprimées automatiquement.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========= FOOTER ========= -->
+<footer class="h-10 bg-[#141417] border border-[#1f1f21] rounded-xl shrink-0 flex items-center justify-between px-6 mx-2 mb-2" style="font-size:8px;font-family:monospace;">
+    <div class="flex items-center gap-5">
+        <span style="color:var(--green);font-weight:800;">● POKER_LOBBY</span>
+        <span style="color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;">Texas Hold'em — No Limit</span>
+    </div>
+    <span style="color:#3f3f46;font-style:italic;letter-spacing:.15em;text-transform:uppercase;">Koden Casino</span>
+</footer>
+
+<div id="notification-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- ========= FIREBASE + LOBBY LOGIC ========= -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+    getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc,
+    onSnapshot, query, orderBy, serverTimestamp, getDocs, where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// ── Firebase init ─────────────────────────────────────────
+const fbConfig = {
+    apiKey: "AIzaSyBzucz2akqXT-LQ5ENHqz3U2yaJciJmM04",
+    authDomain: "koden-casino.firebaseapp.com",
+    projectId: "koden-casino",
+    storageBucket: "koden-casino.firebasestorage.app",
+    messagingSenderId: "730117054841",
+    appId: "1:730117054841:web:e34b5b14fd825d9ce2cfa8"
+};
+const app = initializeApp(fbConfig);
+const db  = getFirestore(app);
+
+// ── State ─────────────────────────────────────────────────
+const ME = localStorage.getItem('active_session');
+if (!ME) { window.location.href = 'auth.html'; throw new Error('No session'); }
+
+let balance      = 0;
+let allTables    = [];
+let curFilter    = 'all';
+let selTableId   = null;
+let selTable     = null;
+let maxPlayers   = 6;
+let visibility   = 'public';
+// Cache profilePics: { username -> url }
+const playerPicsCache = {};
+
+async function fetchPlayerPic(username) {
+    if (playerPicsCache[username] !== undefined) return playerPicsCache[username];
+    try {
+        const snap = await getDoc(doc(db, "users", username));
+        const pp   = snap.exists() ? (snap.data().stats?.profilePic || "") : "";
+        playerPicsCache[username] = pp;
+        return pp;
+    } catch(e) { playerPicsCache[username] = ""; return ""; }
+}
+
+function avatarHTML(username) {
+    const pp = playerPicsCache[username];
+    if (pp) {
+        return `<div class="mini-avatar" title="${username}" style="overflow:hidden;padding:0;">
+            <img src="${pp}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" 
+                 onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+            <span style="display:none;align-items:center;justify-content:center;width:100%;height:100%;font-size:11px;">👤</span>
+        </div>`;
+    }
+    return `<div class="mini-avatar" title="${username}">👤</div>`;
+}
+
+// ── Boot ──────────────────────────────────────────────────
+async function init() {
+    document.getElementById('nav-username').textContent = ME;
+
+    // Load user balance + profilePic
+    try {
+        const snap = await getDoc(doc(db, "users", ME));
+        if (snap.exists()) {
+            const data = snap.data();
+            balance = data.balance || 0;
+            setBalanceUI(balance);
+            // Apply profile pic like other pages
+            const pp = data.stats?.profilePic || "";
+            if (typeof applyPP === "function") applyPP(pp);
+            else {
+                const img   = document.getElementById("display-pp");
+                const emoji = document.getElementById("display-emoji");
+                if (pp && img && emoji) {
+                    img.src = pp; img.classList.remove("hidden"); emoji.classList.add("hidden");
+                }
+            }
+            // Cache pp for avatar display
+            window._myPP = pp;
+        }
+    } catch(e) { console.error(e); }
+
+    buildPlayersSelector();
+    listenTables();
+
+    setTimeout(() => {
+        const l = document.getElementById('koden-loader');
+        l.style.transition = 'opacity .4s';
+        l.style.opacity = '0';
+        setTimeout(() => l.style.display = 'none', 400);
+    }, 900);
+}
+
+function setBalanceUI(b) {
+    document.getElementById('nav-balance').textContent = parseFloat(b).toFixed(2);
+    document.getElementById('c-bal').textContent       = parseFloat(b).toFixed(2);
+    document.getElementById('j-bal').textContent       = parseFloat(b).toFixed(2);
+}
+
+// ── Listen to tables (real-time) ──────────────────────────
+function listenTables() {
+    const q = query(collection(db, "poker_tables"), orderBy("createdAt", "desc"));
+    onSnapshot(q, snap => {
+        allTables = [];
+        let totalP = 0, inGame = 0;
+        const now = Date.now();
+
+        snap.forEach(ds => {
+            const t = { id: ds.id, ...ds.data() };
+            const players = t.players || {};
+            const pCount  = Object.keys(players).length;
+            // Auto-delete stale empty tables > 2h
+            const age = now - (t.createdAt?.toMillis?.() || 0);
+            if (pCount === 0 && age > 7_200_000) { deleteDoc(doc(db,"poker_tables",t.id)); return; }
+            allTables.push(t);
+            totalP += pCount;
+            if (t.status === 'playing') inGame++;
+        });
+
+        document.getElementById('s-tables').textContent  = allTables.length;
+        document.getElementById('s-players').textContent = totalP;
+        // After snapshot, pre-fetch all player pics then re-render
+        const allPlayerNames = new Set();
+        allTables.forEach(t => Object.keys(t.players||{}).forEach(n => allPlayerNames.add(n)));
+        Promise.all([...allPlayerNames].map(n => fetchPlayerPic(n))).then(() => renderTables(allTables));
+        document.getElementById('s-games').textContent   = inGame;
+        document.getElementById('online-count').textContent =
+            `${totalP} joueur${totalP !== 1 ? 's' : ''} en ligne`;
+
+        renderTables();
+    });
+}
+
+// ── Render table cards ────────────────────────────────────
+function renderTables() {
+    document.getElementById('empty-loader').style.display = 'none';
+    const list = document.getElementById('tables-list');
+    list.style.display = 'grid';
+
+    let tables = allTables;
+    if (curFilter === 'waiting') tables = allTables.filter(t => t.status === 'waiting');
+    if (curFilter === 'playing') tables = allTables.filter(t => t.status === 'playing');
+
+    if (!tables.length) {
+        list.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;text-align:center;grid-column:1/-1;">
+            <div style="font-size:36px;opacity:.25;">🃏</div>
+            <p style="font-size:11px;font-weight:700;color:#52525b;text-transform:uppercase;letter-spacing:.1em;">Aucune table disponible</p>
+            <p style="font-size:9px;color:#3f3f46;">Sois le premier à créer une table !</p>
+        </div>`;
+        return;
+    }
+
+    list.innerHTML = '';
+    tables.forEach((t, i) => {
+        const players  = t.players || {};
+        const pCount   = Object.keys(players).length;
+        const maxP     = t.maxPlayers || 6;
+        const isFull   = pCount >= maxP;
+        const imSeated = !!players[ME];
+        const isPlaying = t.status === 'playing';
+        const stake    = stakeLevel(t.blindBig || 10);
+
+        // Seats dots
+        const seatsHTML = Array.from({length: maxP}, (_,idx) =>
+            `<div class="seat-dot ${idx < pCount ? 'on' : 'off'}"></div>`).join('');
+
+        // Avatars row — fetch real profile pics asynchronously
+        const names = Object.keys(players).slice(0, 5);
+        // Pre-fetch pics for all players in this table (non-blocking)
+        names.forEach(n => fetchPlayerPic(n));
+        const avatarsHTML = names.map(n => avatarHTML(n)).join('');
+
+        const lock = t.visibility === 'private' ? '🔒 ' : '';
+        const statusColor = isPlaying ? 'var(--green)' : isFull ? '#ef4444' : 'var(--gold)';
+        const statusLabel = isPlaying ? 'En cours' : isFull ? 'Complet' : 'En attente';
+        const dotClass    = isPlaying ? 'g' : isFull ? 'r' : 'y';
+        const clickable   = !isFull || imSeated;
+
+        const card = document.createElement('div');
+        card.className = `table-card fade-up ${isFull && !imSeated ? 'full' : ''}`;
+        card.style.animationDelay = `${i*45}ms`;
+        if (clickable) card.onclick = () => openJoin(t);
+
+        card.innerHTML = `
+        <div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;">
+            <!-- Row 1 : title + status -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                        <span style="font-size:13px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;">
+                            ${lock}${t.name || 'Table sans nom'}
+                        </span>
+                        ${imSeated ? `<span style="font-size:7px;background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.3);padding:2px 6px;border-radius:99px;font-weight:800;text-transform:uppercase;white-space:nowrap;">Tu joues ici</span>` : ''}
+                    </div>
+                    <span style="font-size:8px;color:#52525b;font-weight:600;">par ${t.createdBy || '?'}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+                    <span class="stakes-badge s-${stake}">${stakeLabel(stake)}</span>
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        <div class="pulse-dot ${dotClass}"></div>
+                        <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${statusColor};">${statusLabel}</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Row 2 : seats + blinds -->
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="display:flex;gap:4px;align-items:center;">${seatsHTML}</div>
+                    <span style="font-size:8px;color:#52525b;font-weight:700;">${pCount}/${maxP}</span>
+                </div>
+                <span class="blinds-pill">${t.blindSmall||5} / ${t.blindBig||10}</span>
+            </div>
+            <!-- Row 3 : avatars + join btn -->
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                    ${pCount > 0 ? `<div style="display:flex;">${avatarsHTML}</div>` : '<span style="font-size:8px;color:#3f3f46;">Aucun joueur</span>'}
+                    ${pCount > 5 ? `<span style="font-size:8px;color:#52525b;">+${pCount-5}</span>` : ''}
+                </div>
+                ${clickable
+                    ? `<button class="btn-join">${imSeated ? '↩ Retourner' : '♠ Rejoindre'}</button>`
+                    : `<span style="font-size:8px;color:#3f3f46;font-weight:700;">Table pleine</span>`}
+            </div>
+            <!-- Row 4 : buy-in min -->
+            <div style="font-size:8px;color:#3f3f46;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding-top:8px;border-top:1px solid rgba(255,255,255,.04);">
+                Buy-in min : <span style="color:#52525b;">${t.buyInMin||100} coins</span>
+            </div>
+        </div>`;
+        list.appendChild(card);
+    });
+}
+
+function stakeLevel(bb) { return bb<=10?'low':bb<=50?'mid':bb<=200?'high':'vip'; }
+function stakeLabel(l) { return {low:'🟢 Micro',mid:'🟡 Moyen',high:'🔴 Haut',vip:'💎 VIP'}[l]; }
+
+// ── Filter tabs ───────────────────────────────────────────
+window.filter = function(f) {
+    curFilter = f;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-'+f).classList.add('active');
+    renderTables();
+};
+
+// ── CREATE TABLE ──────────────────────────────────────────
+window.openCreate = function() {
+    document.getElementById('c-bal').textContent = parseFloat(balance).toFixed(2);
+    document.getElementById('create-modal').classList.remove('hidden');
+};
+window.closeCreate = function() {
+    document.getElementById('create-modal').classList.add('hidden');
+    document.getElementById('c-err').classList.add('hidden');
+};
+
+function buildPlayersSelector() {
+    const wrap = document.getElementById('c-players');
+    wrap.innerHTML = '';
+    [2,3,4,5,6,7,8,9].forEach(n => {
+        const btn = document.createElement('button');
+        btn.textContent = n;
+        btn.className = 'player-select-btn' + (n===6?' sel':'');
+        btn.onclick = () => {
+            maxPlayers = n;
+            wrap.querySelectorAll('.player-select-btn').forEach(b => b.classList.remove('sel'));
+            btn.classList.add('sel');
+        };
+        wrap.appendChild(btn);
+    });
+}
+
+window.setVis = function(v) {
+    visibility = v;
+    document.getElementById('v-pub').className  = 'vis-btn' + (v==='public'?' sel-pub':'');
+    document.getElementById('v-priv').className = 'vis-btn' + (v==='private'?' sel-priv':'');
+    document.getElementById('pw-field').classList.toggle('hidden', v !== 'private');
+};
+
+window.createTable = async function() {
+    const name  = document.getElementById('c-name').value.trim() || `Table de ${ME}`;
+    const sb    = parseInt(document.getElementById('c-sb').value)    || 5;
+    const bb    = parseInt(document.getElementById('c-bb').value)    || 10;
+    const buyin = parseInt(document.getElementById('c-buyin').value) || 100;
+    const pw    = document.getElementById('c-pw').value.trim();
+    const errEl = document.getElementById('c-err');
+    errEl.classList.add('hidden');
+
+    if (isNaN(sb) || sb < 1)  { showErr(errEl, 'Petite blind invalide.'); return; }
+    if (isNaN(bb) || bb < 2)  { showErr(errEl, 'Grande blind invalide.'); return; }
+    if (bb < sb*2)            { showErr(errEl, 'La grande blind doit être ≥ 2× la petite blind.'); return; }
+    if (isNaN(buyin) || buyin < bb) { showErr(errEl, `Buy-in minimum : ${bb} coins.`); return; }
+    if (balance < buyin)      { showErr(errEl, `Solde insuffisant (${parseFloat(balance).toFixed(2)} coins disponibles).`); return; }
+
+    // Disable button to prevent double-click
+    const createBtn = document.querySelector('.btn-create[onclick="createTable()"], button[onclick="createTable()"]');
+    if (createBtn) { createBtn.disabled = true; createBtn.textContent = '⏳ Création...'; }
+
+    try {
+        // Deduct balance FIRST
+        const uSnap = await getDoc(doc(db,"users",ME));
+        if (!uSnap.exists()) throw new Error("Utilisateur introuvable");
+        const realBal = uSnap.data().balance || 0;
+        if (realBal < buyin) throw new Error(`Solde insuffisant (${realBal} coins)`);
+        await updateDoc(doc(db,"users",ME), { balance: realBal - buyin });
+        balance = realBal - buyin;
+        setBalanceUI(balance);
+
+        // Create table WITH creator already seated (atomic — no second getDoc needed)
+        const initialPlayers = {};
+        initialPlayers[ME] = { chips: buyin, status: 'active', joinedAt: Date.now(), emoji: '👤' };
+
+        const ref = await addDoc(collection(db,"poker_tables"), {
+            name, blindSmall: sb, blindBig: bb, buyInMin: buyin, maxPlayers,
+            visibility, password: visibility === 'private' ? pw : null,
+            status: 'waiting', players: initialPlayers, createdBy: ME,
+            createdAt: serverTimestamp(), gameState: null
+        });
+
+        closeCreate();
+        notify(`Table "${name}" créée ! Redirection…`, 'success');
+
+        // Short delay so Firestore propagates, then redirect
+        setTimeout(() => { window.location.href = `poker.html?table=${ref.id}`; }, 600);
+
+    } catch(e) {
+        showErr(errEl, e.message);
+        if (createBtn) { createBtn.disabled = false; createBtn.textContent = '♠ Créer la Table'; }
+    }
+};
+
+// ── JOIN TABLE ────────────────────────────────────────────
+window.openJoin = function(t) {
+    if ((t.players||{})[ME]) { window.location.href = `poker.html?table=${t.id}`; return; }
+    selTableId = t.id; selTable = t;
+    document.getElementById('j-name').textContent    = t.name||'Table sans nom';
+    document.getElementById('j-amount').value        = t.buyInMin||100;
+    document.getElementById('j-info').textContent    = `Minimum : ${t.buyInMin||100} coins — Blinds : ${t.blindSmall}/${t.blindBig}`;
+    document.getElementById('j-bal').textContent     = parseFloat(balance).toFixed(2);
+    document.getElementById('j-pw-wrap').classList.toggle('hidden', t.visibility !== 'private');
+    document.getElementById('j-pw').value = '';
+    document.getElementById('j-err').classList.add('hidden');
+
+    const pCount = Object.keys(t.players||{}).length;
+    document.getElementById('j-stats').innerHTML = `
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:7px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Joueurs</p>
+            <p style="font-size:18px;font-weight:800;color:var(--green);">${pCount}/${t.maxPlayers}</p>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:7px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Blinds</p>
+            <p style="font-size:15px;font-weight:800;color:var(--gold);">${t.blindSmall}/${t.blindBig}</p>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+            <p style="font-size:7px;color:#52525b;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Statut</p>
+            <p style="font-size:10px;font-weight:800;color:${t.status==='playing'?'var(--green)':'var(--gold)'};">${t.status==='playing'?'En cours':'Attente'}</p>
+        </div>`;
+    document.getElementById('join-modal').classList.remove('hidden');
+};
+
+window.closeJoin = function() {
+    document.getElementById('join-modal').classList.add('hidden');
+    selTableId = null; selTable = null;
+};
+
+window.confirmJoin = async function() {
+    if (!selTableId||!selTable) return;
+    const amount = parseInt(document.getElementById('j-amount').value);
+    const pw     = document.getElementById('j-pw').value.trim();
+    const errEl  = document.getElementById('j-err');
+    errEl.classList.add('hidden');
+
+    if (amount < (selTable.buyInMin||100)) { showErr(errEl,`Buy-in minimum : ${selTable.buyInMin} coins.`); return; }
+    if (amount > balance)                  { showErr(errEl,`Solde insuffisant (${parseFloat(balance).toFixed(2)} coins).`); return; }
+    if (selTable.visibility==='private' && pw!==selTable.password) { showErr(errEl,'Mot de passe incorrect.'); return; }
+
+    closeJoin();
+    await doJoin(selTableId, amount);
+};
+
+async function doJoin(tableId, buyIn) {
+    try {
+        // Refresh user balance
+        const uSnap = await getDoc(doc(db,"users",ME));
+        if (!uSnap.exists()) throw new Error("Utilisateur introuvable");
+        const realBal = uSnap.data().balance || 0;
+        if (realBal < buyIn) throw new Error("Solde insuffisant");
+
+        // Deduct coins
+        await updateDoc(doc(db,"users",ME), { balance: realBal - buyIn });
+        balance = realBal - buyIn;
+        setBalanceUI(balance);
+
+        // Add to table — retry up to 3x to handle Firestore propagation delay
+        let tSnap = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            tSnap = await getDoc(doc(db,"poker_tables",tableId));
+            if (tSnap.exists()) break;
+            await new Promise(r => setTimeout(r, 500)); // wait 500ms between retries
+        }
+        if (!tSnap || !tSnap.exists()) throw new Error("Table introuvable");
+        const tData = tSnap.data();
+        const players = { ...(tData.players||{}) };
+        if (Object.keys(players).length >= tData.maxPlayers) throw new Error("Table complète");
+
+        players[ME] = { chips: buyIn, status: 'active', joinedAt: Date.now(), emoji: '👤' };
+        await updateDoc(doc(db,"poker_tables",tableId), { players });
+
+        notify(`✅ Tu as rejoint la table avec ${buyIn} coins !`, 'success');
+        setTimeout(() => { window.location.href = `poker.html?table=${tableId}`; }, 800);
+    } catch(e) { notify(e.message, 'error'); }
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+
+window.notify = function(msg, type='info') {
+    const c = document.getElementById('notification-container');
+    if (!c) return;
+    const colors = { success:'#22c55e', error:'#ef4444', info:'#8b5cf6' };
+    const t = document.createElement('div');
+    t.style.cssText = `background:#141417;border-left:3px solid ${colors[type]};padding:12px 20px;border-radius:12px;display:flex;align-items:center;gap:12px;pointer-events:auto;min-width:280px;box-shadow:0 10px 30px rgba(0,0,0,.5);margin-bottom:8px;`;
+    t.innerHTML = `<p style="font-size:11px;font-weight:700;color:white;">${msg}</p>`;
+    c.appendChild(t);
+    setTimeout(() => { t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(()=>t.remove(),400); }, 3500);
+};
+
+// Close modals on backdrop click
+['create-modal','join-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target===this) { id==='create-modal' ? closeCreate() : closeJoin(); }
+    });
+});
+
+init();
+</script>
+</body>
+</html>
