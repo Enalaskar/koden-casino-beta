@@ -721,8 +721,9 @@ window.confirmJoin = async function() {
     if (amount > balance)                  { showErr(errEl,`Solde insuffisant (${parseFloat(balance).toFixed(2)} coins).`); return; }
     if (selTable.visibility==='private' && pw!==selTable.password) { showErr(errEl,'Mot de passe incorrect.'); return; }
 
+    const tableIdToJoin = selTableId;
     closeJoin();
-    await doJoin(selTableId, amount);
+    await doJoin(tableIdToJoin, amount);
 };
 
 async function doJoin(tableId, buyIn) {
