@@ -39,61 +39,76 @@ canvas#plinko { display:block; border-radius:20px; }
   filter: brightness(1.3);
   box-shadow: 0 0 10px currentColor;
 }
-</style>
+    .chip-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px dashed; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.65rem; cursor: pointer; transition: transform 0.15s, filter 0.15s; flex-shrink: 0; }
+    .chip-btn:hover { transform: scale(1.12); filter: brightness(1.2); }
+    .chip-btn:active { transform: scale(0.95); }
+    </style>
 </head>
 <body class="h-screen bg-[#0F0F12] text-white overflow-hidden font-sans flex flex-col p-4 gap-4">
 
 <!-- NAV -->
-<nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl">
-  <div class="flex items-center gap-6">
-    <a href="index.html" class="flex items-center gap-2 group">
-      <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
-      <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
-    </a>
-  </div>
-  <div class="flex items-center gap-4">
-    <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
-      <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
-      <span class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
+<nav class="h-16 bg-[#141417] border border-[#1f1f21] rounded-2xl flex items-center justify-between px-6 shrink-0 shadow-xl relative">
+    <div class="flex items-center gap-4">
+        <a href="index.html" class="flex items-center gap-2 group">
+            <div class="w-1 h-5 bg-[#8b5cf6] rounded-full group-hover:bg-[#fbbf24] transition-colors"></div>
+            <span class="text-xl font-black italic tracking-tighter uppercase">Koden</span>
+        </a>
+        <div class="w-px h-5 bg-[#1f1f21]"></div>
+        <span class="text-[10px] font-black text-zinc-400 uppercase tracking-widest">⬇️ Plinko</span>
     </div>
-    <div class="relative">
-      <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all group">
-        <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-          <img id="display-pp" src="" class="w-full h-full object-cover hidden">
-          <span id="display-emoji" class="text-base opacity-50">&#x1F464;</span>
+    <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3 bg-[#0F0F12] border border-yellow-500/30 px-4 py-1.5 rounded-xl">
+            <img src="coin.png" class="w-4 h-4 animate-pulse" alt="coin">
+            <span class="text-[13px] font-mono font-bold text-[#fbbf24] balance-display">0.00</span>
         </div>
-        <div class="flex flex-col items-start leading-none gap-1">
-          <div class="flex items-center gap-1.5">
-            <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">User</span>
-            <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
-          </div>
-          <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+        <div class="relative">
+            <button onclick="toggleProfileCard()" class="flex items-center gap-3 bg-[#141417]/50 hover:bg-[#1c1c21] border border-white/5 p-1.5 pr-4 rounded-xl transition-all duration-300 group relative">
+                <div id="user-pp-container" class="w-10 h-10 rounded-lg bg-[#0F0F12] border border-white/10 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-[#8b5cf6]/50 transition-colors">
+                    <img id="display-pp" src="" class="w-full h-full object-cover hidden" alt="pp">
+                    <span id="display-emoji" class="text-base opacity-50">&#x1F464;</span>
+                </div>
+                <div class="flex flex-col items-start leading-none gap-1">
+                    <div class="flex items-center gap-1.5">
+                        <span id="nav-username" class="text-[11px] font-black uppercase tracking-wider text-white/90">User</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_8px_#22c55e]"></div>
+                    </div>
+                    <span class="text-[7px] text-zinc-500 font-bold uppercase tracking-[0.2em]">Session_Active</span>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-zinc-600 group-hover:text-white transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[100] animate-fadeIn">
+                <div class="flex flex-col gap-5">
+                    <div class="text-center border-b border-[#1f1f21] pb-4">
+                        <p class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">User_Terminal</p>
+                    </div>
+                    <div class="space-y-2">
+                        <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all mb-2">Modifier la Photo (URL)</button>
+                        <button onclick="logout()" class="w-full bg-[#1c1c21] border border-zinc-800 text-zinc-300 font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-white/5 transition-all">Se Déconnecter</button>
+                        <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 border border-[#ef4444]/20 text-[#ef4444] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer le compte</button>
+                    </div>
+                </div>
+            </div>
         </div>
-      </button>
-      <div id="profile-card" class="hidden absolute top-16 right-0 w-72 bg-[#141417] border-2 border-[#1f1f21] rounded-2xl p-6 shadow-2xl z-[100]">
-        <div class="space-y-2">
-          <button onclick="changePP()" class="w-full bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#8b5cf6] hover:text-white transition-all">Modifier la photo</button>
-          <button onclick="logout()" class="w-full bg-[#1c1c21] border border-zinc-800 text-zinc-300 font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-white/5 transition-all">Se Deconnecter</button>
-          <button onclick="deleteAccount()" class="w-full bg-[#ef4444]/5 border border-[#ef4444]/20 text-[#ef4444] font-black py-3 rounded-xl uppercase italic text-[10px] hover:bg-[#ef4444] hover:text-white transition-all">Supprimer le compte</button>
-        </div>
-      </div>
     </div>
-  </div>
 </nav>
 
 <main class="flex-1 flex gap-4 overflow-hidden min-h-0">
 
   <!-- SIDEBAR -->
-  <aside class="w-72 bg-[#141417] border border-[#1f1f21] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl overflow-y-auto custom-scroll shrink-0">
+  <aside class="w-80 bg-[#141417] border border-[#1f1f21] rounded-3xl p-6 flex flex-col gap-5 shadow-2xl overflow-y-auto custom-scroll shrink-0">
     <div>
       <label class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Mise par balle</label>
       <input id="plinko-bet" type="number" value="10" min="1" step="1" class="w-full bg-[#0F0F12] border border-[#1f1f21] rounded-xl p-4 text-sm font-bold outline-none focus:border-[#fbbf24]/50 transition-all text-white mb-3">
-      <div class="grid grid-cols-4 gap-2">
-        <button onclick="document.getElementById('plinko-bet').value=5"   class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">5</button>
-        <button onclick="document.getElementById('plinko-bet').value=25"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">25</button>
-        <button onclick="document.getElementById('plinko-bet').value=50"  class="bg-[#0F0F12] border border-[#1f1f21] text-zinc-400 font-black text-[9px] py-2 rounded-xl hover:border-[#8b5cf6]/50 hover:text-white transition-all">50</button>
-        <button onclick="document.getElementById('plinko-bet').value=100" class="bg-[#0F0F12] border border-[#fbbf24]/20 text-[#fbbf24] font-black text-[9px] py-2 rounded-xl hover:border-[#fbbf24] transition-all">100</button>
-      </div>
+<div class="flex gap-2 justify-between mt-3">
+                <div class="chip-btn" style="background:radial-gradient(circle,#ef4444,#b91c1c);border-color:#ef4444;color:white" onclick="document.getElementById('plinko-bet').value=5">5</div>
+                <div class="chip-btn" style="background:radial-gradient(circle,#3b82f6,#1d4ed8);border-color:#3b82f6;color:white" onclick="document.getElementById('plinko-bet').value=10">10</div>
+                <div class="chip-btn" style="background:radial-gradient(circle,#22c55e,#15803d);border-color:#22c55e;color:white" onclick="document.getElementById('plinko-bet').value=25">25</div>
+                <div class="chip-btn" style="background:radial-gradient(circle,#a855f7,#7e22ce);border-color:#a855f7;color:white" onclick="document.getElementById('plinko-bet').value=50">50</div>
+                <div class="chip-btn" style="background:radial-gradient(circle,#fbbf24,#d97706);border-color:#fbbf24;color:black" onclick="document.getElementById('plinko-bet').value=100">100</div>
+            </div>
+
     </div>
 
     <!-- Risque -->
@@ -146,10 +161,18 @@ canvas#plinko { display:block; border-radius:20px; }
   </aside>
 
   <!-- GAME CANVAS -->
-  <section class="flex-1 bg-[#141417] border border-[#1f1f21] rounded-3xl flex items-center justify-center relative overflow-hidden shadow-2xl">
-    <canvas id="plinko" style="max-height:100%;max-width:100%;object-fit:contain;"></canvas>
+  <section class="flex-1 border border-[#1f1f21] rounded-3xl flex items-center justify-center relative overflow-hidden shadow-2xl" style="background:#05050d;">
+    <canvas id="plinko" style="max-height:100%;max-width:100%;object-fit:contain;border-radius:20px;"></canvas>
     <!-- Result flash -->
-    <div id="plinko-result" class="absolute bottom-8 left-1/2 -translate-x-1/2 text-2xl font-black italic uppercase tracking-tighter pointer-events-none opacity-0 transition-all duration-300"></div>
+    <div id="plinko-result" class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transition-all duration-500"
+         style="font-size:20px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;
+                text-shadow:0 0 20px currentColor;background:rgba(0,0,0,0.7);padding:8px 20px;border-radius:12px;
+                border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(8px);"></div>
+    <!-- Ball count indicator -->
+    <div class="absolute top-4 right-4 flex items-center gap-2" style="background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:5px 12px;">
+      <div style="width:6px;height:6px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px #a78bfa;animation:pulse 2s infinite;"></div>
+      <span id="ball-count-display" style="font-size:9px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.1em;">0 balle(s)</span>
+    </div>
   </section>
 </main>
 
@@ -168,8 +191,8 @@ canvas#plinko { display:block; border-radius:20px; }
 const canvas = document.getElementById('plinko');
 const ctx    = canvas.getContext('2d');
 
-// Dimensions calibrées
-const W = 580, H = 660;
+// Dimensions
+const W = 600, H = 680;
 canvas.width  = W;
 canvas.height = H;
 
@@ -214,6 +237,7 @@ function setRisk(r) {
   btn.style.opacity = '1';
   btn.classList.add('active-risk');
   renderMultDisplay();
+  buildBg();
 }
 
 function renderMultDisplay() {
@@ -280,108 +304,274 @@ function buildBallPath() {
   return { waypoints, bucket, decisions };
 }
 
+// ── PARTICLES ────────────────────────────────────────────────────────
+let particles = [];
+function spawnParticles(x, y, color, count = 10) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.5,
+      life: 1.0,
+      decay: 0.045 + Math.random() * 0.03,
+      r: 2 + Math.random() * 3,
+      color,
+    });
+  }
+}
+function updateParticles() {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.12; // gravity
+    p.life -= p.decay;
+    p.r *= 0.97;
+  });
+}
+
+// ── BACKGROUND (drawn once to offscreen canvas) ───────────────────────
+let bgCanvas = null;
+function buildBg() {
+  bgCanvas = document.createElement('canvas');
+  bgCanvas.width = W; bgCanvas.height = H;
+  const bctx = bgCanvas.getContext('2d');
+
+  // Fond uni très sombre
+  bctx.fillStyle = '#07070f';
+  bctx.fillRect(0, 0, W, H);
+
+  // Glow central doux
+  const cg = bctx.createRadialGradient(W/2, H*0.38, 0, W/2, H*0.38, W*0.5);
+  cg.addColorStop(0,   'rgba(90,50,180,0.09)');
+  cg.addColorStop(1,   'transparent');
+  bctx.fillStyle = cg;
+  bctx.fillRect(0, 0, W, H);
+
+  // Grille propre : lignes horizontales et verticales fines
+  bctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  bctx.lineWidth = 0.5;
+  // Horizontales — espacées comme les rangées de pegs
+  for (let row = 0; row < ROWS + 1; row++) {
+    const ly = PAD_Y + row * STEP_Y - STEP_Y / 2;
+    bctx.beginPath();
+    bctx.moveTo(PAD_X, ly);
+    bctx.lineTo(W - PAD_X, ly);
+    bctx.stroke();
+  }
+  // Verticales — une par colonne de bucket
+  for (let i = 0; i <= SLOTS; i++) {
+    const lx = PAD_X + i * STEP_X;
+    bctx.beginPath();
+    bctx.moveTo(lx, PAD_Y - STEP_Y / 2);
+    bctx.lineTo(lx, PAD_Y + ROWS * STEP_Y + STEP_Y / 2);
+    bctx.stroke();
+  }
+
+  // Points d'intersection discrets
+  bctx.fillStyle = 'rgba(255,255,255,0.07)';
+  for (let row = 0; row < ROWS + 1; row++) {
+    const ly = PAD_Y + row * STEP_Y - STEP_Y / 2;
+    for (let i = 0; i <= SLOTS; i++) {
+      const lx = PAD_X + i * STEP_X;
+      bctx.beginPath();
+      bctx.arc(lx, ly, 1, 0, Math.PI * 2);
+      bctx.fill();
+    }
+  }
+}
+buildBg();
+
+// ── PEG HIT FLASH ─────────────────────────────────────────────────────
+let pegFlashes = {}; // "row-col": alpha
+
 // ── DRAWING ───────────────────────────────────────────────────────────
 function drawBoard() {
-  // Background
-  ctx.fillStyle = '#07070e';
-  ctx.fillRect(0, 0, W, H);
+  // Draw cached background
+  ctx.drawImage(bgCanvas, 0, 0);
 
-  // Subtle dot grid
-  ctx.fillStyle = 'rgba(255,255,255,0.025)';
-  for (let gx = 0; gx < W; gx += 18)
-    for (let gy = 0; gy < H; gy += 18)
-      ctx.fillRect(gx, gy, 1.2, 1.2);
-
-  const bucketTopY = PAD_Y + ROWS * STEP_Y + 8;
+  const bucketTopY = PAD_Y + ROWS * STEP_Y + 10;
   const mults  = MULTS[currentRisk];
   const colors = BUCKET_COLORS[currentRisk];
 
-  // ── BUCKETS ──
+  // ── BUCKETS ──────────────────────────────────────────────────────
   for (let i = 0; i < SLOTS; i++) {
-    const bx  = PAD_X + i * STEP_X;
-    const col = colors[i];
+    const bx    = PAD_X + i * STEP_X;
+    const col   = colors[i];
     const flash = flashBuckets[i] || 0;
+    const bw    = STEP_X - 3;
+    const bh    = BUCKET_H - 2;
+    const br    = 9;
 
-    // Background fill
-    ctx.fillStyle = col + (flash > 0 ? Math.floor(Math.min(flash * 0.55, 0.45) * 255).toString(16).padStart(2,'0') : '18');
-    roundRect(ctx, bx + 2, bucketTopY, STEP_X - 4, BUCKET_H - 4, 7);
+    // Glow behind bucket on flash
+    if (flash > 0.05) {
+      ctx.shadowColor = col;
+      ctx.shadowBlur  = 18 * flash;
+    }
+
+    // Bucket body gradient
+    const bg = ctx.createLinearGradient(bx, bucketTopY, bx, bucketTopY + bh);
+    const alpha = Math.floor((0.12 + flash * 0.45) * 255).toString(16).padStart(2,'0');
+    bg.addColorStop(0,   col + Math.floor((0.25 + flash * 0.4)*255).toString(16).padStart(2,'0'));
+    bg.addColorStop(1,   col + alpha);
+    ctx.fillStyle = bg;
+    roundRect(ctx, bx + 1.5, bucketTopY, bw, bh, br);
     ctx.fill();
+    ctx.shadowBlur = 0;
 
     // Border
-    ctx.strokeStyle = col + (flash > 0 ? 'cc' : '55');
-    ctx.lineWidth   = flash > 0 ? 2 : 1;
-    roundRect(ctx, bx + 2, bucketTopY, STEP_X - 4, BUCKET_H - 4, 7);
+    ctx.strokeStyle = flash > 0.1
+      ? col + Math.floor(flash * 220).toString(16).padStart(2,'0')
+      : col + '44';
+    ctx.lineWidth = flash > 0.1 ? 1.5 : 0.8;
+    roundRect(ctx, bx + 1.5, bucketTopY, bw, bh, br);
     ctx.stroke();
 
-    // Multiplier text
-    ctx.fillStyle   = flash > 0 ? col : col + 'cc';
-    ctx.font        = `bold ${mults[i] >= 100 ? 8 : mults[i] >= 10 ? 9 : 10}px monospace`;
-    ctx.textAlign   = 'center';
+    // Top accent line
+    if (flash > 0.05) {
+      ctx.strokeStyle = col + 'dd';
+      ctx.lineWidth   = 2;
+      ctx.beginPath();
+      ctx.moveTo(bx + 1.5 + br, bucketTopY);
+      ctx.lineTo(bx + 1.5 + bw - br, bucketTopY);
+      ctx.stroke();
+    }
+
+    // Multiplier text — size adapts
+    const fontSize = mults[i] >= 1000 ? 7 : mults[i] >= 100 ? 8 : mults[i] >= 10 ? 9.5 : 11;
+    ctx.fillStyle    = flash > 0.1 ? '#ffffff' : col + 'ee';
+    ctx.font         = `900 ${fontSize}px "Space Grotesk", monospace`;
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(mults[i] + 'x', bx + STEP_X / 2, bucketTopY + BUCKET_H / 2 - 2);
+    // Shadow for readability
+    ctx.shadowColor  = flash > 0.1 ? col : 'transparent';
+    ctx.shadowBlur   = flash > 0.1 ? 8 : 0;
+    ctx.fillText(mults[i] + 'x', bx + STEP_X / 2, bucketTopY + bh / 2);
+    ctx.shadowBlur = 0;
 
     // Flash decay
     if (flash > 0) {
-      flashBuckets[i] = flash * 0.88;
+      flashBuckets[i] = flash * 0.86;
       if (flashBuckets[i] < 0.01) delete flashBuckets[i];
     }
   }
 
-  // ── PEGS ──
+  // ── PEGS ──────────────────────────────────────────────────────────
   for (let row = 0; row < ROWS; row++) {
-    const isEven  = row % 2 === 0;
+    const isEven   = row % 2 === 0;
     const pegCount = isEven ? ROWS + 1 : ROWS;
+
     for (let col = 0; col < pegCount; col++) {
       const { x, y } = pegPos(row, col);
+      const key       = row + '-' + col;
+      const pegFlash  = pegFlashes[key] || 0;
 
-      // Check proximity to any ball for glow
+      // Proximity glow
       let nearestDist = Infinity;
       balls.forEach(b => {
         const d = Math.hypot(b.x - x, b.y - y);
         if (d < nearestDist) nearestDist = d;
       });
-      const proximity = Math.max(0, 1 - nearestDist / 60);
+      const prox = Math.max(0, 1 - nearestDist / 55);
 
-      ctx.shadowColor = `rgba(139,92,246,${0.3 + proximity * 0.5})`;
-      ctx.shadowBlur  = 4 + proximity * 8;
+      const totalGlow = Math.max(prox, pegFlash);
+
+      // Outer glow ring
+      if (totalGlow > 0.05) {
+        const rg = ctx.createRadialGradient(x, y, PEG_R, x, y, PEG_R + 8 * totalGlow);
+        rg.addColorStop(0,   `rgba(167,139,250,${0.35 * totalGlow})`);
+        rg.addColorStop(1,   'transparent');
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(x, y, PEG_R + 8 * totalGlow, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Peg body gradient
+      const pg = ctx.createRadialGradient(x - 1.2, y - 1.5, 0.5, x, y, PEG_R);
+      if (totalGlow > 0.1) {
+        pg.addColorStop(0,   '#ffffff');
+        pg.addColorStop(0.4, `rgba(220,200,255,${0.9})`);
+        pg.addColorStop(1,   `rgba(139,92,246,${0.95})`);
+      } else {
+        pg.addColorStop(0,   'rgba(255,255,255,0.9)');
+        pg.addColorStop(0.3, 'rgba(180,160,240,0.75)');
+        pg.addColorStop(1,   'rgba(80,50,160,0.6)');
+      }
       ctx.beginPath();
       ctx.arc(x, y, PEG_R, 0, Math.PI * 2);
-      ctx.fillStyle = proximity > 0.1
-        ? `rgba(200,180,255,${0.7 + proximity * 0.3})`
-        : 'rgba(139,92,246,0.75)';
+      ctx.fillStyle = pg;
       ctx.fill();
+
+      // Highlight dot
+      ctx.beginPath();
+      ctx.arc(x - 1.2, y - 1.5, 1.2, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${0.5 + totalGlow * 0.4})`;
+      ctx.fill();
+
+      // Flash decay
+      if (pegFlash > 0) {
+        pegFlashes[key] = pegFlash * 0.82;
+        if (pegFlashes[key] < 0.01) delete pegFlashes[key];
+      }
     }
   }
-  ctx.shadowBlur = 0;
 
-  // ── BALLS ──
+  // ── PARTICLES ──────────────────────────────────────────────────────
+  updateParticles();
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life * 0.85;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  // ── BALLS ──────────────────────────────────────────────────────────
   balls.forEach(b => {
     if (!b.trail) return;
 
-    // Trail
+    // Glow trail
     b.trail.forEach((t, i) => {
-      const a = (i / b.trail.length) * 0.35;
-      const r = BALL_R * (0.4 + i / b.trail.length * 0.6);
+      const frac = i / b.trail.length;
+      const a    = frac * 0.4;
+      const r    = BALL_R * (0.3 + frac * 0.7);
+      ctx.globalAlpha = a;
       ctx.beginPath();
       ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(167,139,250,${a})`;
+      ctx.fillStyle = '#a78bfa';
       ctx.fill();
     });
+    ctx.globalAlpha = 1;
 
-    // Ball glow
-    ctx.shadowColor = 'rgba(167,139,250,0.9)';
-    ctx.shadowBlur  = 14;
+    // Outer glow
+    const og = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, BALL_R + 7);
+    og.addColorStop(0,   'rgba(167,139,250,0.5)');
+    og.addColorStop(1,   'transparent');
+    ctx.fillStyle = og;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, BALL_R + 7, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Ball gradient
-    const grad = ctx.createRadialGradient(b.x - 2, b.y - 2.5, 1.5, b.x, b.y, BALL_R);
-    grad.addColorStop(0,   '#ffffff');
-    grad.addColorStop(0.35,'#ddd5ff');
-    grad.addColorStop(1,   '#8b5cf6');
+    // Ball body
+    const grad = ctx.createRadialGradient(b.x - 2, b.y - 2.5, 1, b.x, b.y, BALL_R);
+    grad.addColorStop(0,    '#ffffff');
+    grad.addColorStop(0.25, '#e8d5ff');
+    grad.addColorStop(0.65, '#a78bfa');
+    grad.addColorStop(1,    '#6d28d9');
     ctx.beginPath();
     ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.shadowBlur = 0;
+
+    // Specular highlight
+    ctx.beginPath();
+    ctx.arc(b.x - 2, b.y - 2.5, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fill();
   });
 }
 
@@ -422,6 +612,20 @@ function updateBalls() {
 
     if (b.t >= 1) {
       b.t -= 1;
+      // Flash the peg we just hit
+      if (b.wpIdx > 0 && b.wpIdx <= ROWS) {
+        const row = b.wpIdx - 1;
+        const isEven = row % 2 === 0;
+        const px = wp[b.wpIdx].x;
+        const py = PAD_Y + row * STEP_Y;
+        // Find nearest peg col
+        const col = isEven
+          ? Math.round((px - PAD_X) / STEP_X)
+          : Math.round((px - PAD_X - STEP_X/2) / STEP_X);
+        pegFlashes[row + '-' + col] = 1.0;
+        // Tiny spark
+        spawnParticles(px, py, '#a78bfa', 4);
+      }
       b.wpIdx++;
       if (b.wpIdx >= wp.length - 1) {
         b.x = wp[wp.length - 1].x;
@@ -454,8 +658,15 @@ async function finalizeBall(b) {
   pkBalls++;
   document.getElementById('pk-balls').textContent = pkBalls;
 
-  // Flash bucket
+  // Flash bucket + particles
   flashBuckets[b.bucket] = 1.2;
+  const bucketCX = PAD_X + b.bucket * STEP_X + STEP_X / 2;
+  const bucketCY = PAD_Y + ROWS * STEP_Y + BUCKET_H / 2;
+  const pCol = BUCKET_COLORS[currentRisk][b.bucket];
+  const pCount = mult >= 100 ? 28 : mult >= 10 ? 18 : mult >= 1 ? 10 : 6;
+  spawnParticles(bucketCX, bucketCY, pCol, pCount);
+  // Extra white sparks for big wins
+  if (mult >= 10) spawnParticles(bucketCX, bucketCY - 10, '#ffffff', 8);
 
   // Credit winnings
   if (win > 0) {
@@ -579,6 +790,9 @@ function toggleAutoBet() {
 function loop() {
   updateBalls();
   drawBoard();
+  // Update ball count
+  const bcd = document.getElementById('ball-count-display');
+  if (bcd) bcd.textContent = balls.length + ' balle' + (balls.length !== 1 ? 's' : '') + ' en vol';
   requestAnimationFrame(loop);
 }
 loop();
